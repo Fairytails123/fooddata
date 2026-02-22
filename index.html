@@ -44,6 +44,11 @@
       --ft-med-red-border: #FECACA;
       --ft-no-match: #F59E0B;
       --ft-no-match-bg: #FFFBEB;
+
+      /* ADDED: Boarding School colour scheme — distinct purple/violet */
+      --ft-school: #8B5CF6;
+      --ft-school-dark: #6D28D9;
+      --ft-school-gradient: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -200,6 +205,11 @@
       gap: 12px;
     }
 
+    /* ADDED: Boarding School card header uses purple gradient */
+    .card-header.school {
+      background: var(--ft-school-gradient);
+    }
+
     .card-header .dog-identity {
       display: flex;
       align-items: center;
@@ -234,6 +244,21 @@
       font-size: 13px;
       font-weight: 600;
       color: rgba(255,255,255,0.75);
+    }
+
+    /* ADDED: Type badge on card header — small pill label */
+    .card-type-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      margin-left: 6px;
+      vertical-align: middle;
     }
 
     .meals-badge {
@@ -680,6 +705,16 @@
     // ============================================================
 
     /**
+     * ADDED: Returns the display label for a stay type.
+     * @param {string} type - 'boarding' or 'school'
+     * @return {string} Human-readable label
+     */
+    function getTypeBadgeLabel(type) {
+      if (type === 'school') return 'School';
+      return 'Holiday';
+    }
+
+    /**
      * Builds the HTML for food type tag badges.
      * @param {Array} foodTypes - Array of food type strings from JotForm
      * @return {string} HTML string of food tags
@@ -807,6 +842,9 @@
 
     /**
      * Builds a complete dog card HTML.
+     * MODIFIED: Now reads dog.type to apply school styling on the card header
+     * and show a type badge (Holiday/School).
+     *
      * @param {Object} dog - Dog data object from the API
      * @param {number} index - Card index for staggered animation
      * @return {string} Complete card HTML
@@ -815,15 +853,22 @@
       var delay = index * 60;
       var feeding = dog.feeding;
 
+      // ADDED: Determine stay type for card header styling
+      var stayType = dog.type || 'boarding';
+      var headerClass = 'card-header' + (stayType === 'school' ? ' school' : '');
+      var badgeLabel = getTypeBadgeLabel(stayType);
+
       // Card header
       var html = '<div class="dog-card fade-in" style="animation-delay:' + delay + 'ms;">';
 
-      // Header bar
-      html += '<div class="card-header">' +
+      // Header bar — MODIFIED: uses headerClass for school gradient
+      html += '<div class="' + headerClass + '">' +
                 '<div class="dog-identity">' +
                   '<div class="paw-icon">' + pawIconSVG() + '</div>' +
                   '<div>' +
-                    '<div class="dog-name">' + escapeHtml(dog.dogName) + '</div>' +
+                    '<div class="dog-name">' + escapeHtml(dog.dogName) +
+                      ' <span class="card-type-badge">' + badgeLabel + '</span>' +
+                    '</div>' +
                     (dog.ownerSurname
                       ? '<div class="owner-name">' + escapeHtml(dog.ownerSurname) + '</div>'
                       : '') +
