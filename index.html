@@ -531,7 +531,7 @@
         <img src="https://i.ibb.co/whdBKp0L/Logo-1.jpg" alt="Fairy Tails K9 Centre" class="logo">
         <div class="header-title">
           <h1>Boarding Feeding Board</h1>
-          <div class="subtitle">Meal requirements for all boarding dogs</div>
+          <div class="subtitle">Today's stays &amp; tomorrow's arrivals</div>
         </div>
       </div>
       <div class="header-right">
@@ -661,6 +661,62 @@
       }
 
       return result;
+    }
+
+
+    // ============================================================
+    // TODAY + TOMORROW FILTER
+    // ============================================================
+
+    /**
+     * Filters dogs to only those staying today or arriving tomorrow.
+     * - "Staying today": checkIn <= today AND checkOut > today
+     * - "Arriving tomorrow": checkIn == tomorrow
+     * Dogs whose stay starts after tomorrow are excluded.
+     */
+    function filterTodayTomorrow(dogs) {
+      var now = new Date();
+      var todayStr = now.getFullYear() + '-' +
+        ('0' + (now.getMonth() + 1)).slice(-2) + '-' +
+        ('0' + now.getDate()).slice(-2);
+
+      var tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      var tomorrowStr = tomorrow.getFullYear() + '-' +
+        ('0' + (tomorrow.getMonth() + 1)).slice(-2) + '-' +
+        ('0' + tomorrow.getDate()).slice(-2);
+
+      var result = [];
+      for (var i = 0; i < dogs.length; i++) {
+        var dog = dogs[i];
+        var checkIn = dog.checkIn;
+        var checkOut = dog.checkOut;
+
+        // Currently staying today (checked in on or before today, checks out after today)
+        var stayingToday = (checkIn <= todayStr && checkOut > todayStr);
+
+        // Arriving tomorrow
+        var arrivingTomorrow = (checkIn === tomorrowStr);
+
+        if (stayingToday || arrivingTomorrow) {
+          // Tag the dog so the card can show context
+          dog._arrivalLabel = arrivingTomorrow && !stayingToday ? 'tomorrow' : 'today';
+          result.push(dog);
+        }
+      }
+
+      return result;
+    }
+
+    /**
+     * Formats "Today & Tomorrow" date label for the header badge.
+     */
+    function formatTodayTomorrow() {
+      var now = new Date();
+      var tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return 'Today ' + now.getDate() + ' ' + MONTH_NAMES[now.getMonth()] +
+             ' + Tomorrow ' + tomorrow.getDate() + ' ' + MONTH_NAMES[tomorrow.getMonth()];
     }
 
 
@@ -878,15 +934,16 @@
         feedingWarnEl.style.display = 'none';
       }
 
-      if (data.dateRange && data.dateRange.start && data.dateRange.end) {
-        dateRangeEl.textContent = formatDateRange(data.dateRange.start, data.dateRange.end);
-      }
+      // Show "Today + Tomorrow" in the date badge instead of full range
+      dateRangeEl.textContent = formatTodayTomorrow();
 
       if (data.lastUpdated) {
         lastUpdatedEl.textContent = formatLastUpdated(data.lastUpdated);
       }
 
-      var dogs = data.dogs ? deduplicateDogs(data.dogs) : [];
+      // Filter to today's stays + tomorrow's arrivals, then deduplicate
+      var filtered = data.dogs ? filterTodayTomorrow(data.dogs) : [];
+      var dogs = deduplicateDogs(filtered);
       var count = dogs.length;
       dogCountEl.textContent = count + ' Dog' + (count !== 1 ? 's' : '') + ' Boarding';
 
