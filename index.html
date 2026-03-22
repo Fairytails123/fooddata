@@ -606,13 +606,16 @@
   <script>
     // ============================================================
     // CONFIGURATION
-    // Paste your deployed Apps Script web app URL below.
-    // The ?mode=feeding parameter is appended automatically.
+    // API_URL   — Deployed Apps Script web app URL
+    // API_TOKEN — Must match the API_TOKEN variable in the .gs file
     // ============================================================
     var API_URL = 'https://script.google.com/macros/s/AKfycbz2kc3lJbrGk7lw9jVcZMdUrPWjRx4qBARM8YVAIARhYAlQwCzlhHBbKswyOcVHytmB7Q/exec';
+    var API_TOKEN = 'ft-k9-board-2024-sec';
 
     // Refresh every 1 hour (feeding data changes less often than bookings)
     var REFRESH_INTERVAL_MS = 1 * 60 * 60 * 1000;
+    var CARD_STAGGER_MS = 60;
+    var MAX_TOTAL_ANIMATION_MS = 800;
     var nextRefreshTime = null;
     var countdownTimer = null;
 
@@ -849,8 +852,9 @@
      * @param {number} index - Card index for staggered animation
      * @return {string} Complete card HTML
      */
-    function buildDogCard(dog, index) {
-      var delay = index * 60;
+    function buildDogCard(dog, index, totalCards) {
+      var staggerMs = Math.min(CARD_STAGGER_MS, MAX_TOTAL_ANIMATION_MS / Math.max(totalCards, 1));
+      var delay = Math.round(index * staggerMs);
       var feeding = dog.feeding;
 
       // ADDED: Determine stay type for card header styling
@@ -962,8 +966,9 @@
         emptyEl.style.display = 'none';
 
         var html = '';
-        for (var i = 0; i < data.dogs.length; i++) {
-          html += buildDogCard(data.dogs[i], i);
+        var totalCards = data.dogs.length;
+        for (var i = 0; i < totalCards; i++) {
+          html += buildDogCard(data.dogs[i], i, totalCards);
         }
         gridEl.innerHTML = html;
 
@@ -987,8 +992,8 @@
         document.getElementById('loadingState').style.display = 'flex';
       }
 
-      // Append ?mode=feeding to the API URL
-      var fetchUrl = API_URL + (API_URL.indexOf('?') === -1 ? '?' : '&') + 'mode=feeding';
+      // Append mode and token to the API URL
+      var fetchUrl = API_URL + (API_URL.indexOf('?') === -1 ? '?' : '&') + 'mode=feeding&token=' + encodeURIComponent(API_TOKEN);
 
       fetch(fetchUrl)
         .then(function(response) {
