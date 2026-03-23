@@ -69,7 +69,7 @@
       flex-direction: column;
       width: 1920px;
       height: 1080px;
-      padding: 16px 24px 10px;
+      padding: 16px 40px 10px;
     }
 
     /* --- Header (compact) --- */
@@ -169,11 +169,12 @@
     .cards-grid {
       flex: 1;
       display: grid;
-      grid-template-columns: repeat(var(--card-cols), 1fr);
+      grid-template-columns: repeat(var(--card-cols), minmax(0, 1fr));
       gap: var(--card-gap);
       align-content: start;
       overflow: hidden;
       min-height: 0;
+      max-width: 100%;
     }
 
     /* --- Dog Card --- */
@@ -748,7 +749,7 @@
       }
 
       // Safety check: ensure cards have at least ~120px height
-      var availableHeight = 944; // 1080 - header - footer - padding
+      var availableHeight = 928; // 1080 - header(56) - footer(28) - padding(26) - gaps(~42)
       var rows = Math.ceil(dogCount / cols);
       var cardHeight = (availableHeight - (rows - 1) * gap) / rows;
       if (cardHeight < 120 && cols < 6) {
