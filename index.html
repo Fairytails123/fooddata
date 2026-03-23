@@ -48,6 +48,7 @@
 
       /* Dynamic layout — set by JS */
       --card-cols: 4;
+      --card-rows: 2;
       --card-gap: 10px;
       --fs: 1;
     }
@@ -170,8 +171,9 @@
       flex: 1;
       display: grid;
       grid-template-columns: repeat(var(--card-cols), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--card-rows, 2), minmax(0, 1fr));
       gap: var(--card-gap);
-      align-content: start;
+      align-content: stretch;
       overflow: hidden;
       min-height: 0;
       max-width: 100%;
@@ -760,6 +762,7 @@
 
       var root = document.documentElement;
       root.style.setProperty('--card-cols', cols);
+      root.style.setProperty('--card-rows', rows);
       root.style.setProperty('--card-gap', gap + 'px');
       root.style.setProperty('--fs', fs);
 
