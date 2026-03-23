@@ -56,8 +56,8 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
-      width: 1920px;
-      height: 1080px;
+      width: 100vw;
+      height: 100vh;
       overflow: hidden;
       background: var(--ft-bg);
       font-family: 'Nunito', sans-serif;
@@ -68,8 +68,8 @@
     .page {
       display: flex;
       flex-direction: column;
-      width: 1920px;
-      height: 1080px;
+      width: 100vw;
+      height: 100vh;
       padding: 16px 40px 10px;
     }
 
@@ -751,7 +751,8 @@
       }
 
       // Safety check: ensure cards have at least ~120px height
-      var availableHeight = 928; // 1080 - header(56) - footer(28) - padding(26) - gaps(~42)
+      var viewportHeight = window.innerHeight || 1080;
+      var availableHeight = viewportHeight - 56 - 28 - 26 - 42; // header + footer + padding + gaps
       var rows = Math.ceil(dogCount / cols);
       var cardHeight = (availableHeight - (rows - 1) * gap) / rows;
       if (cardHeight < 120 && cols < 6) {
