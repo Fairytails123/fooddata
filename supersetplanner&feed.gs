@@ -42,9 +42,10 @@ var BOARDING_SCHOOL_TYPE_NAME = 'boarding school';
 // --- Cache durations ---
 var FEEDING_CACHE_SECONDS = 1800; // 30 minutes for JotForm data
 var BOARDING_TYPE_CACHE_SECONDS = 86400; // 24 hours for appointment type ID
+var FULL_RESPONSE_CACHE_SECONDS = 300; // 5 minutes for the full API response
 
 // --- Date range for boarding data ---
-var LOOKBACK_DAYS = 30;
+var LOOKBACK_DAYS = 7;   // Only need stays overlapping today/tomorrow
 var FORWARD_DAYS = 6;
 
 // --- API fetch limits ---
@@ -330,14 +331,14 @@ function fetchAppointmentsForType_(typeId, minDate, maxDate, stayType) {
     }
   }
 
-  // Fetch only uncached appointment details — in batches to avoid UrlFetchApp rate limits
+  // Fetch only uncached appointment details — in small batches with delays to avoid Acuity bandwidth limits
   if (fetchRequests.length > 0) {
-    var BATCH_SIZE = 10;
+    var BATCH_SIZE = 5;
     var allDetailResponses = [];
 
     for (var batchStart = 0; batchStart < fetchRequests.length; batchStart += BATCH_SIZE) {
       if (batchStart > 0) {
-        Utilities.sleep(1000); // Pause between batches to avoid rate-limit
+        Utilities.sleep(2000); // 2s pause between batches to stay under Acuity rate/bandwidth limits
       }
       var batchEnd = Math.min(batchStart + BATCH_SIZE, fetchRequests.length);
       var batch = fetchRequests.slice(batchStart, batchEnd);
@@ -400,8 +401,20 @@ function fetchAppointmentsForType_(typeId, minDate, maxDate, stayType) {
  * @return {Object} { stays: [...], dateRange: { start, end }, lastUpdated, error }
  */
 function getBoardingData() {
+  // Check full boarding response cache first
+  var boardingCache = CacheService.getScriptCache();
+  var cachedBoarding = boardingCache.get('fullBoardingResponse');
+  if (cachedBoarding) {
+    try {
+      Logger.log('Returning cached boarding response');
+      return JSON.parse(cachedBoarding);
+    } catch (e) {
+      Logger.log('Boarding cache parse error: ' + e.message);
+    }
+  }
+
   try {
-    // 1. Date range: 30 days back to today + 6 days forward
+    // 1. Date range: 7 days back to today + 6 days forward
     var today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -538,12 +551,24 @@ function getBoardingData() {
       return a.dogName.localeCompare(b.dogName);
     });
 
-    return {
+    var boardingResult = {
       stays: stays,
       dateRange: { start: displayStart, end: displayEnd },
       lastUpdated: new Date().toISOString(),
       error: null
     };
+
+    // Cache so repeat calls (e.g. from getFeedingBoardData) don't re-fetch
+    try {
+      var brJson = JSON.stringify(boardingResult);
+      if (brJson.length < CACHE_SIZE_LIMIT) {
+        boardingCache.put('fullBoardingResponse', brJson, FULL_RESPONSE_CACHE_SECONDS);
+      }
+    } catch (cacheErr) {
+      Logger.log('Boarding cache write error: ' + cacheErr.message);
+    }
+
+    return boardingResult;
 
   } catch (e) {
     Logger.log('getBoardingData error: ' + e.message);
@@ -1030,6 +1055,18 @@ function buildKibbleSummary_(record) {
  * }
  */
 function getFeedingBoardData() {
+  // --- Full response cache: avoid hitting Acuity/JotForm on every TV refresh ---
+  var cache = CacheService.getScriptCache();
+  var cachedResponse = cache.get('fullFeedingResponse');
+  if (cachedResponse) {
+    try {
+      Logger.log('Returning cached feeding board response');
+      return JSON.parse(cachedResponse);
+    } catch (e) {
+      Logger.log('Cached response parse error, fetching fresh: ' + e.message);
+    }
+  }
+
   var feedingError = null;
 
   try {
@@ -1078,7 +1115,7 @@ function getFeedingBoardData() {
       return a.dogName.localeCompare(b.dogName);
     });
 
-    return {
+    var result = {
       dogs: dogs,
       dogCount: dogs.length,
       dateRange: boardingData.dateRange,
@@ -1086,6 +1123,19 @@ function getFeedingBoardData() {
       error: null,
       feedingError: feedingError
     };
+
+    // Cache the full response so subsequent TV refreshes don't hit APIs
+    try {
+      var resultJson = JSON.stringify(result);
+      if (resultJson.length < CACHE_SIZE_LIMIT) {
+        cache.put('fullFeedingResponse', resultJson, FULL_RESPONSE_CACHE_SECONDS);
+        Logger.log('Cached full feeding response (' + resultJson.length + ' chars, TTL ' + FULL_RESPONSE_CACHE_SECONDS + 's)');
+      }
+    } catch (cacheErr) {
+      Logger.log('Could not cache full response: ' + cacheErr.message);
+    }
+
+    return result;
 
   } catch (e) {
     Logger.log('getFeedingBoardData error: ' + e.message);
