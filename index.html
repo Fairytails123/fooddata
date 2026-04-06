@@ -171,7 +171,7 @@
       flex: 1;
       display: grid;
       grid-template-columns: repeat(var(--card-cols), minmax(0, 1fr));
-      grid-template-rows: repeat(var(--card-rows, 2), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--card-rows, 2), minmax(auto, 1fr));
       gap: var(--card-gap);
       align-content: stretch;
       overflow: hidden;
@@ -264,14 +264,16 @@
     }
 
     .card-body {
-      padding: calc(6px * var(--fs)) calc(8px * var(--fs)) calc(8px * var(--fs));
+      padding: calc(var(--card-pad, 6px) * var(--fs)) calc(8px * var(--fs)) calc(var(--card-pad, 6px) * var(--fs));
       display: flex;
       flex-direction: column;
-      gap: calc(4px * var(--fs));
+      gap: calc(3px * var(--fs));
       flex: 1;
       min-height: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      scrollbar-width: none;
     }
+    .card-body::-webkit-scrollbar { display: none; }
 
     /* Food tags */
     .food-tags {
@@ -350,12 +352,12 @@
     }
 
     .notes-text {
-      font-size: calc(11px * var(--fs));
+      font-size: calc(10px * var(--fs));
       font-weight: 600;
       color: #78350F;
       line-height: 1.3;
       display: -webkit-box;
-      -webkit-line-clamp: 2;
+      -webkit-line-clamp: var(--notes-clamp, 3);
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -399,15 +401,11 @@
     }
 
     .med-alert-text {
-      font-size: calc(10px * var(--fs));
+      font-size: calc(9px * var(--fs));
       font-weight: 600;
       color: #991B1B;
       line-height: 1.3;
       margin-top: 1px;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
     }
 
     /* No match */
@@ -761,11 +759,17 @@
         fs = Math.max(fs - 0.05, 0.65);
       }
 
+      // Dynamic notes clamp and card padding based on dog count
+      var notesClamp = dogCount <= 6 ? 99 : dogCount <= 12 ? 3 : 2;
+      var cardPad = dogCount <= 6 ? 6 : dogCount <= 12 ? 4 : 3;
+
       var root = document.documentElement;
       root.style.setProperty('--card-cols', cols);
       root.style.setProperty('--card-rows', rows);
       root.style.setProperty('--card-gap', gap + 'px');
       root.style.setProperty('--fs', fs);
+      root.style.setProperty('--notes-clamp', notesClamp);
+      root.style.setProperty('--card-pad', cardPad + 'px');
 
       return { cols: cols, rows: rows, gap: gap, fs: fs };
     }
