@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr create --title 'Fix Acuity bandwidth quota exceeded error' --body ' *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(base64 -w 0 \"supersetplanner&feed.gs\")",
+      "Read(//tmp/**)",
+      "Bash(split -b 15000 /tmp/gs_b64.txt /tmp/gs_part_)",
+      "Bash(pwd -W)",
+      "Bash(cygpath -w /tmp)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

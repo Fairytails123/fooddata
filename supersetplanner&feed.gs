@@ -42,7 +42,7 @@ var BOARDING_SCHOOL_TYPE_NAME = 'boarding school';
 // --- Cache durations ---
 var FEEDING_CACHE_SECONDS = 1800; // 30 minutes for JotForm data
 var BOARDING_TYPE_CACHE_SECONDS = 21600; // 6 hours (CacheService max) for appointment type ID
-var FULL_RESPONSE_CACHE_SECONDS = 900; // 15 minutes for the full API response
+var FULL_RESPONSE_CACHE_SECONDS = 18000; // 5 hours — TV polls 3×/day at 07/13/18, 5h cache absorbs any extra reloads
 var STALE_CACHE_FALLBACK_SECONDS = 21600; // 6 hours — serve stale data when upstream fails
 
 // --- Dog name cache lives in PropertiesService (not CacheService) so it

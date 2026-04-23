@@ -580,7 +580,10 @@
     var API_URL = 'https://script.google.com/macros/s/AKfycbz2kc3lJbrGk7lw9jVcZMdUrPWjRx4qBARM8YVAIARhYAlQwCzlhHBbKswyOcVHytmB7Q/exec';
     var API_TOKEN = 'ft-k9-board-2024-sec';
 
-    var REFRESH_INTERVAL_MS = 1 * 60 * 60 * 1000;
+    // Refresh at 07:00, 13:00, 18:00 (browser local time — TV must be on Europe/London).
+    // Three calls a day keeps us well under Acuity's bandwidth quota and matches
+    // the shift boundaries when feeding info actually needs to be read.
+    var SCHEDULED_REFRESH_HOURS = [7, 13, 18];
     var nextRefreshTime = null;
     var countdownTimer = null;
 
@@ -1010,8 +1013,22 @@
         });
     }
 
+    function computeNextRefreshTime() {
+      var now = new Date();
+      for (var i = 0; i < SCHEDULED_REFRESH_HOURS.length; i++) {
+        var candidate = new Date(now);
+        candidate.setHours(SCHEDULED_REFRESH_HOURS[i], 0, 0, 0);
+        if (candidate.getTime() > now.getTime()) return candidate.getTime();
+      }
+      // All of today's slots have passed — schedule for tomorrow's first slot
+      var tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(SCHEDULED_REFRESH_HOURS[0], 0, 0, 0);
+      return tomorrow.getTime();
+    }
+
     function scheduleNextRefresh() {
-      nextRefreshTime = Date.now() + REFRESH_INTERVAL_MS;
+      nextRefreshTime = computeNextRefreshTime();
       if (countdownTimer) clearInterval(countdownTimer);
 
       countdownTimer = setInterval(function() {
