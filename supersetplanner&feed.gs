@@ -41,8 +41,15 @@ var BOARDING_SCHOOL_TYPE_NAME = 'boarding school';
 
 // --- Cache durations ---
 var FEEDING_CACHE_SECONDS = 1800; // 30 minutes for JotForm data
-var BOARDING_TYPE_CACHE_SECONDS = 86400; // 24 hours for appointment type ID
-var FULL_RESPONSE_CACHE_SECONDS = 300; // 5 minutes for the full API response
+var BOARDING_TYPE_CACHE_SECONDS = 21600; // 6 hours (CacheService max) for appointment type ID
+var FULL_RESPONSE_CACHE_SECONDS = 900; // 15 minutes for the full API response
+var STALE_CACHE_FALLBACK_SECONDS = 21600; // 6 hours — serve stale data when upstream fails
+
+// --- Dog name cache lives in PropertiesService (not CacheService) so it
+//     persists indefinitely. A given Acuity appointment ID's dog name never
+//     changes, so caching forever is safe and eliminates repeat detail fetches
+//     that were burning through Acuity's monthly bandwidth quota.
+var DOG_NAME_PROPERTY_KEY = 'acuityDogNameCache';
 
 // --- Date range for boarding data ---
 var LOOKBACK_DAYS = 7;   // Only need stays overlapping today/tomorrow
@@ -175,14 +182,24 @@ function acuityGet_(endpoint, params) {
   return withRetry_(function() {
     var response = UrlFetchApp.fetch(url, options);
     var code = response.getResponseCode();
+    var body = response.getContentText();
 
     if (code !== 200) {
-      Logger.log('Acuity API error (' + code + '): ' + response.getContentText());
-      throw new Error('Acuity API returned status ' + code);
+      Logger.log('Acuity API error (' + code + '): ' + body);
+      // Surface Acuity's error message (e.g. "Bandwidth quota exceeded...")
+      // so callers can distinguish bandwidth issues from other failures.
+      var detail = '';
+      try {
+        var parsed = JSON.parse(body);
+        detail = parsed.message || parsed.error || '';
+      } catch (_) {
+        detail = body.substring(0, 200);
+      }
+      throw new Error('Acuity API status ' + code + (detail ? ': ' + detail : ''));
     }
 
     try {
-      return JSON.parse(response.getContentText());
+      return JSON.parse(body);
     } catch (parseErr) {
       Logger.log('Acuity response parse error: ' + parseErr.message);
       throw new Error('Acuity API returned invalid JSON (status ' + code + ')');
@@ -304,14 +321,17 @@ function fetchAppointmentsForType_(typeId, minDate, maxDate, stayType) {
 
   if (!appointments || !appointments.length) return [];
 
-  // Check the dog name cache — avoids re-fetching details for known appointments
-  var cache = CacheService.getScriptCache();
+  // Dog names never change for a given appointment ID, so we persist them in
+  // PropertiesService (permanent) rather than CacheService (6 hour max). This
+  // ensures we only fetch an appointment's detail ONCE — ever — which is the
+  // critical fix for Acuity's "Bandwidth quota exceeded" error.
+  var props = PropertiesService.getScriptProperties();
   var dogNameCache = {};
   try {
-    var cached = cache.get('dogNameCache');
-    if (cached) dogNameCache = JSON.parse(cached);
+    var stored = props.getProperty(DOG_NAME_PROPERTY_KEY);
+    if (stored) dogNameCache = JSON.parse(stored);
   } catch (e) {
-    Logger.log('Dog name cache parse error: ' + e.message);
+    Logger.log('Dog name property cache parse error: ' + e.message);
   }
 
   // Only fetch details for appointments we haven't cached
@@ -361,14 +381,11 @@ function fetchAppointmentsForType_(typeId, minDate, maxDate, stayType) {
       }
     }
 
-    // Update the dog name cache (cache for same duration as feeding data)
+    // Persist the dog name cache permanently — these mappings never change.
     try {
-      var cacheData = JSON.stringify(dogNameCache);
-      if (cacheData.length < CACHE_SIZE_LIMIT) {
-        cache.put('dogNameCache', cacheData, FEEDING_CACHE_SECONDS);
-      }
+      props.setProperty(DOG_NAME_PROPERTY_KEY, JSON.stringify(dogNameCache));
     } catch (e) {
-      Logger.log('Dog name cache write error: ' + e.message);
+      Logger.log('Dog name property write error: ' + e.message);
     }
   }
 
@@ -568,10 +585,34 @@ function getBoardingData() {
       Logger.log('Boarding cache write error: ' + cacheErr.message);
     }
 
+    // Mirror the successful response into PropertiesService so we can serve
+    // stale data if Acuity throttles us on a later refresh.
+    try {
+      PropertiesService.getScriptProperties()
+        .setProperty('lastGoodBoardingResponse', JSON.stringify(boardingResult));
+    } catch (staleErr) {
+      Logger.log('Stale boarding write error: ' + staleErr.message);
+    }
+
     return boardingResult;
 
   } catch (e) {
     Logger.log('getBoardingData error: ' + e.message);
+
+    // If Acuity is throttling us, fall back to the last good response so the
+    // TV keeps showing yesterday's data rather than going blank.
+    try {
+      var stale = PropertiesService.getScriptProperties()
+        .getProperty('lastGoodBoardingResponse');
+      if (stale) {
+        var staleParsed = JSON.parse(stale);
+        staleParsed.error = 'Showing last known data — upstream error: ' + e.message;
+        return staleParsed;
+      }
+    } catch (fallbackErr) {
+      Logger.log('Stale boarding read error: ' + fallbackErr.message);
+    }
+
     return {
       stays: [],
       dateRange: { start: '', end: '' },
@@ -1073,7 +1114,10 @@ function getFeedingBoardData() {
     // 1. Get boarding stays (reuses existing function)
     var boardingData = getBoardingData();
 
-    if (boardingData.error) {
+    // Only bail out when boarding truly has no data. If the stale-cache fallback
+    // kicked in, boardingData.error will be set BUT stays will still be populated
+    // — let that through so the TV keeps showing last known dogs.
+    if (boardingData.error && (!boardingData.stays || boardingData.stays.length === 0)) {
       return {
         dogs: [],
         dogCount: 0,
@@ -1085,6 +1129,7 @@ function getFeedingBoardData() {
     }
 
     var stays = boardingData.stays || [];
+    var upstreamWarning = boardingData.error || null;
 
     // 2. Fetch and parse JotForm feeding submissions
     var feedingRecords = [];
@@ -1120,7 +1165,7 @@ function getFeedingBoardData() {
       dogCount: dogs.length,
       dateRange: boardingData.dateRange,
       lastUpdated: new Date().toISOString(),
-      error: null,
+      error: upstreamWarning,
       feedingError: feedingError
     };
 
@@ -1131,6 +1176,12 @@ function getFeedingBoardData() {
         cache.put('fullFeedingResponse', resultJson, FULL_RESPONSE_CACHE_SECONDS);
         Logger.log('Cached full feeding response (' + resultJson.length + ' chars, TTL ' + FULL_RESPONSE_CACHE_SECONDS + 's)');
       }
+      // Only mirror a CLEAN response (no upstream warning) to the stale-fallback
+      // store — otherwise we'd overwrite good data with already-stale data.
+      if (!upstreamWarning) {
+        PropertiesService.getScriptProperties()
+          .setProperty('lastGoodFeedingResponse', resultJson);
+      }
     } catch (cacheErr) {
       Logger.log('Could not cache full response: ' + cacheErr.message);
     }
@@ -1139,6 +1190,22 @@ function getFeedingBoardData() {
 
   } catch (e) {
     Logger.log('getFeedingBoardData error: ' + e.message);
+
+    // Fall back to last good response so the TV keeps showing feeding data
+    // when Acuity throttles us. Better to show yesterday's dogs than nothing.
+    try {
+      var stale = PropertiesService.getScriptProperties()
+        .getProperty('lastGoodFeedingResponse');
+      if (stale) {
+        var staleParsed = JSON.parse(stale);
+        staleParsed.error = 'Showing last known data — upstream error: ' + e.message;
+        staleParsed.feedingError = feedingError;
+        return staleParsed;
+      }
+    } catch (fallbackErr) {
+      Logger.log('Stale feeding read error: ' + fallbackErr.message);
+    }
+
     return {
       dogs: [],
       dogCount: 0,

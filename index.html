@@ -968,7 +968,10 @@
         gridEl.innerHTML = html;
       } else {
         gridEl.style.display = 'none';
-        emptyEl.style.display = 'flex';
+        // Only show the cheerful "no stays" message when there is no error.
+        // When an error is present, the empty state is misleading — the data
+        // failed to load, not that there are no dogs.
+        emptyEl.style.display = data.error ? 'none' : 'flex';
       }
     }
 
