@@ -868,6 +868,35 @@ function parseFeedingRecord_(submission) {
 // ============================================================
 
 /**
+ * Returns true if two strings are identical or differ by a single edit
+ * (one insertion, deletion, or substitution). Used for the fuzzy-surname
+ * fallback to absorb owner typos like "Wighthman" vs "Wightman".
+ *
+ * Guard: strings shorter than 4 chars must match exactly — fuzzy matching
+ * short surnames (e.g. "Fox" vs "Cox") is too risky.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @return {boolean}
+ */
+function oneEditApart_(a, b) {
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4) return false;
+  if (Math.abs(a.length - b.length) > 1) return false;
+
+  // Match common prefix
+  var i = 0;
+  while (i < a.length && i < b.length && a.charAt(i) === b.charAt(i)) i++;
+  // Match common suffix (not overlapping the prefix)
+  var j = 0;
+  while (j < a.length - i && j < b.length - i &&
+         a.charAt(a.length - 1 - j) === b.charAt(b.length - 1 - j)) j++;
+
+  // At most one differing character remains in each string
+  return (a.length - i - j) <= 1 && (b.length - i - j) <= 1;
+}
+
+/**
  * Matches boarding stays to JotForm feeding records.
  *
  * Acuity stores dog names as "DogFirstName OwnerSurname" (e.g. "Woody Richardson").
@@ -898,6 +927,9 @@ function matchFeedingRecords_(stays, feedingRecords) {
   var MATCH_EXACT_SURNAME = 1;     // ownerSurname field matches
   var MATCH_FULLNAME_IN_FIELD = 2; // "Frida Walsh" in dog name field
   var MATCH_FIRST_NAME_ONLY = 3;   // dog first name only, no surname confirmation
+  // Fallback tiers — only used when tiers 1-3 find nothing (see block below the main loop)
+  var MATCH_FUZZY_SURNAME = 4;     // dog first name matches + surname is a 1-letter typo
+  var MATCH_SURNAME_ONLY = 5;      // surname field matches (covers blank/wrong dog name in Acuity)
 
   for (var i = 0; i < stays.length; i++) {
     var stay = stays[i];
@@ -972,6 +1004,63 @@ function matchFeedingRecords_(stays, feedingRecords) {
       }
     }
 
+    // --- FALLBACK TIERS ---
+    // Only run when the strict tiers (1-3) found nothing. These never override
+    // a good match; they only rescue cards that would otherwise be empty.
+    // Both are guarded to avoid attaching the wrong dog's feeding/medication info.
+    if (!bestMatch && acuitySurname) {
+      var fbMatch = null;
+      var fbPriority = 999;
+      var fbDate = '';
+      var surnameOnlyCount = 0; // how many records share this surname (ambiguity guard)
+
+      for (var m = 0; m < feedingRecords.length; m++) {
+        var rec = feedingRecords[m];
+        var rDogRaw = rec.dogName.replace(/\s+/g, ' ').toLowerCase().trim();
+        var rSur = rec.ownerSurname.replace(/\s+/g, ' ').toLowerCase().trim();
+        var rParts = rDogRaw.split(' ');
+        var rFirst = rParts[0] || '';
+        var rExtra = rParts.slice(1).join(' ');
+        // Surname to compare for the fuzzy tier: the surname field if filled,
+        // otherwise any trailing words in the dog-name field (e.g. "Shadow Wightman")
+        var rSurnameForFuzzy = rSur || rExtra;
+
+        var fp = 999;
+
+        // Fallback A — dog first name matches AND surname is a near-miss (1 letter off).
+        // Catches owner typos like JotForm "Wighthman" vs Acuity "Wightman".
+        if (rFirst === acuityDogName && rSurnameForFuzzy &&
+            oneEditApart_(rSurnameForFuzzy, acuitySurname)) {
+          fp = MATCH_FUZZY_SURNAME;
+        }
+        // Fallback B — surname field exactly matches Acuity's owner surname,
+        // regardless of dog name. Catches a blank/incorrect dog name in Acuity
+        // (e.g. intake form left empty, so the board falls back to the owner's name).
+        else if (rSur && rSur === acuitySurname) {
+          fp = MATCH_SURNAME_ONLY;
+          surnameOnlyCount++;
+        }
+        else {
+          continue;
+        }
+
+        if (!fbMatch || fp < fbPriority || (fp === fbPriority && rec.submittedAt > fbDate)) {
+          fbMatch = rec;
+          fbPriority = fp;
+          fbDate = rec.submittedAt;
+        }
+      }
+
+      // Surname-only matches must be unambiguous — if an owner has more than one
+      // dog with a feeding form under the same surname, we can't tell which is which,
+      // so leave the card empty rather than risk showing the wrong dog's food/meds.
+      if (fbMatch && !(fbPriority === MATCH_SURNAME_ONLY && surnameOnlyCount > 1)) {
+        bestMatch = fbMatch;
+        bestMatchPriority = fbPriority;
+        bestMatchDate = fbDate;
+      }
+    }
+
     // Count how many first-name-only matches we found (for ambiguity warning)
     var firstNameMatchCount = 0;
     if (bestMatchPriority === MATCH_FIRST_NAME_ONLY) {
@@ -994,7 +1083,9 @@ function matchFeedingRecords_(stays, feedingRecords) {
       type: stay.type || 'boarding',
       matched: bestMatch !== null,
       matchType: bestMatch ? (bestMatchPriority === MATCH_EXACT_SURNAME ? 'exact' :
-                              bestMatchPriority === MATCH_FULLNAME_IN_FIELD ? 'fullname' : 'name_only') : 'none',
+                              bestMatchPriority === MATCH_FULLNAME_IN_FIELD ? 'fullname' :
+                              bestMatchPriority === MATCH_FUZZY_SURNAME ? 'fuzzy' :
+                              bestMatchPriority === MATCH_SURNAME_ONLY ? 'surname' : 'name_only') : 'none',
       ambiguousMatch: (firstNameMatchCount > 1)
     };
 
