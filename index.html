@@ -378,10 +378,37 @@
       font-weight: 900;
       color: var(--text);
       line-height: 1.1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 0.25em;
+      min-width: 0;
+    }
+
+    /* Dog first name + owner surname — surnames disambiguate same-named dogs,
+       so both must stay visible. They share one line when they fit; in narrow
+       cards the surname wraps to its own full-width line instead of either
+       part being crushed. Each part ellipsizes only if it alone exceeds the
+       card. Surname is em-sized so it scales with .tcard-name and .scard-name. */
+    .name-first {
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .name-surname {
+      flex: 0 1 auto;
       min-width: 0;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 0.62em;
+      font-weight: 700;
+      color: var(--text-dim);
     }
 
     /* Sits OUTSIDE the name block so a long name never swallows it */
@@ -681,9 +708,10 @@
       font-weight: 900;
       color: var(--text);
       line-height: 1.1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 0.25em;
       min-width: 0;
     }
 
@@ -1172,6 +1200,15 @@
              '<span class="no-match-text">No feeding record — check JotForm</span></div>';
     }
 
+    /* Dog name + owner surname (surname disambiguates same-named dogs). */
+    function buildDogNameHtml(dog) {
+      var html = '<span class="name-first">' + escapeHtml(dog.dogName) + '</span>';
+      if (dog.ownerSurname) {
+        html += '<span class="name-surname">' + escapeHtml(dog.ownerSurname) + '</span>';
+      }
+      return html;
+    }
+
     function buildTodayCard(dog) {
       var feeding = dog.feeding;
       var stayType = dog.type || 'boarding';
@@ -1180,7 +1217,7 @@
 
       var html = '<div class="tcard' + (hasMed ? ' has-med' : '') + '">';
       html += '<div class="tcard-head">' +
-                '<div class="tcard-name">' + escapeHtml(dog.dogName) + '</div>' +
+                '<div class="tcard-name">' + buildDogNameHtml(dog) + '</div>' +
                 '<span class="' + pillClass + '">' + getTypeBadgeLabel(stayType) + '</span>' +
                 '<span class="day-badge today-badge">TODAY</span>' +
               '</div>';
@@ -1210,7 +1247,7 @@
 
       var html = '<div class="scard">';
       html += '<div class="scard-head">' +
-                '<div class="scard-name">' + escapeHtml(dog.dogName) + '</div>' +
+                '<div class="scard-name">' + buildDogNameHtml(dog) + '</div>' +
                 '<span class="' + pillClass + '">' + getTypeBadgeLabel(stayType) + '</span>' +
                 '<span class="day-badge tomorrow-badge">TOMORROW</span>' +
               '</div>';
