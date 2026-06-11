@@ -1,1 +1,3 @@
 .claude/
+# Local test asset — real customer names + medication details; never publish to Pages
+live_api_sample.json

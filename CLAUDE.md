@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A TV dashboard for Fairy Tails K9 Centre that shows which boarding dogs are staying today / arriving tomorrow and their feeding requirements. Two files, no build system, no tests:
 
-- **`index.html`** — single-file static frontend (inline CSS + vanilla ES5 JS). Designed for a Hisense 40" FHD TV (1920×1080), no-scroll, all cards fit one screen. Polls the backend hourly.
+- **`index.html`** — single-file static frontend (inline CSS + vanilla ES5 JS). Designed for a Hisense 40" FHD TV (1920×1080), no-scroll, all cards fit one screen. Refreshes at fixed times (07:00 / 13:00 / 18:00 browser-local) to stay under Acuity's bandwidth quota.
 - **`supersetplanner&feed.gs`** — Google Apps Script web app (the backend "API"). Pulls boarding appointments from **Acuity Scheduling**, feeding records from **JotForm**, matches them, and returns JSON via `doGet`.
 
 The two are deployed separately and communicate over HTTPS:
@@ -17,21 +17,32 @@ There is no local run/build/test/lint tooling. To test the backend, paste it int
 
 ## Data flow (request → screen)
 
-1. TV browser calls `API_URL?mode=feeding&token=...` hourly (`REFRESH_INTERVAL_MS`).
+1. TV browser calls `API_URL?mode=feeding&token=...` at the three scheduled times (`SCHEDULED_REFRESH_HOURS = [7, 13, 18]`, driven by `scheduleNextRefresh()` / `computeNextRefreshTime()`).
 2. `doGet` validates the token, routes `mode=feeding` → `getFeedingBoardData()`.
 3. `getFeedingBoardData()` = `getBoardingData()` (Acuity) + `fetchJotformSubmissions_()` (JotForm) → `matchFeedingRecords_()`.
 4. Returns `{ dogs, dogCount, dateRange, lastUpdated, error, feedingError }`.
 5. Frontend `renderData()` runs **client-side** filtering (`filterTodayTomorrow`) and de-duplication (`deduplicateDogs`), computes a responsive grid via `calculateLayout()`, then builds cards.
 
+The backend sorts `dogs` so the most safety-critical entries are first: **medication dogs float to the top, then matched-before-unmatched, then alphabetical by dog name** (`getFeedingBoardData`). Preserve this — it's what makes meds visible on the TV.
+
 **Important split of responsibility:** the backend returns stays for a wider window (7 days back to 6 forward), but the frontend narrows to *today's stays + tomorrow's arrivals*. The "next 7 days" empty-state text and the date math live in the frontend. Don't assume the displayed set equals the backend's `dogs` array.
 
 ## Key concepts when editing
 
-**Dog-name matching is the trickiest logic** (`matchFeedingRecords_` in the `.gs`). Acuity stores names as `"DogFirstName OwnerSurname"`; JotForm's dog-name field is free text where owners inconsistently enter just the dog name or "Dog Surname", plus a separate (newer) surname field. Matching uses a 3-tier priority (exact surname → full name in dog field → first-name-only fallback), with most-recent submission breaking ties. `ambiguousMatch` flags first-name-only collisions. If feeding data shows on the wrong dog, this is where to look.
+**Dog-name matching is the trickiest logic** (`matchFeedingRecords_` in the `.gs`). Acuity stores names as `"DogFirstName OwnerSurname"`; JotForm's dog-name field is free text where owners inconsistently enter just the dog name or "Dog Surname", plus a separate (newer) surname field. Matching uses a **5-tier priority**, with most-recent submission breaking ties within a tier:
+- **1 exact** — JotForm `ownerSurname` field + dog first name both match.
+- **2 fullname** — dog field holds the full `"DogName Surname"` (or first name + trailing words = surname).
+- **3 name_only** — dog first name matches and the JotForm record has *no* surname info anywhere.
+- **4 fuzzy** (fallback) — dog first name matches and the surname is within one edit (`oneEditApart_`), absorbing owner typos like "Wighthman"/"Wightman".
+- **5 surname** (fallback) — surname field matches regardless of dog name (covers a blank/wrong dog name in Acuity); **skipped if more than one dog shares that surname**, to avoid attaching the wrong dog's food/meds.
+
+Tiers 4–5 run **only when tiers 1–3 find nothing** — they rescue otherwise-empty cards, never override a good match. The chosen tier is exposed on each dog as `matchType` (`exact | fullname | name_only | fuzzy | surname | none`). `ambiguousMatch` flags first-name-only collisions. If feeding data shows on the wrong dog, this is where to look.
 
 **JotForm field IDs are hardcoded** in `JOTFORM_FIELDS` (top of the `.gs`) and keyed to form `240635310347348`. If the form is recreated or fields reordered, these IDs break silently (records parse as null/empty). `parseFeedingRecord_` maps them to clean records.
 
-**Caching is layered and aggressive** (recent commits fixed Acuity bandwidth-quota errors). `CacheService` keys: `fullFeedingResponse`/`fullBoardingResponse` (5 min), `jotformFeedingData` (30 min, incremental via `created_at:gt`), `dogNameCache` (30 min), appointment-type IDs (24 h). Acuity appointment *details* (for dog names) are fetched in batches of 5 with 2 s sleeps to stay under rate limits. When debugging "stale data", account for these TTLs — changes can take up to 5 min to surface.
+**Caching is layered and aggressive** (recent commits fixed Acuity bandwidth-quota errors). `CacheService` keys: `fullFeedingResponse`/`fullBoardingResponse` (**5 h**, `FULL_RESPONSE_CACHE_SECONDS`), `jotformFeedingData` (30 min, incremental via `created_at:gt`), appointment-type IDs (**6 h**, the CacheService max, `BOARDING_TYPE_CACHE_SECONDS`). Dog names are cached **permanently in `PropertiesService`** under `acuityDogNameCache` (`DOG_NAME_PROPERTY_KEY`) — an appointment ID's dog name never changes, so each appointment's detail is fetched exactly *once, ever* (this was the core fix for "Bandwidth quota exceeded"). Acuity appointment *details* (for dog names) are fetched in batches of 5 with 2 s sleeps to stay under rate limits. When debugging "stale data", account for these TTLs — changes can take up to 5 h to surface.
+
+**Stale-data fallback.** On a successful run, `getBoardingData()` / `getFeedingBoardData()` mirror their last *clean* response into `PropertiesService` (`lastGoodBoardingResponse`, `lastGoodFeedingResponse`). If Acuity later throttles, the catch blocks serve that copy with `error` set to "Showing last known data — upstream error: …" while keeping `stays`/`dogs` populated. So **`error` can be non-null while the board still renders real dogs** — don't treat a set `error` as an empty board.
 
 **Two appointment types** are merged: `BOARDING_TYPE_NAME` ('dog boarding') and `BOARDING_SCHOOL_TYPE_NAME` ('boarding school'), matched case-insensitively against Acuity type names. Each dog carries `type: 'boarding' | 'school'`, which drives card styling (purple "school" header vs blue).
 
