@@ -11,9 +11,9 @@ A TV dashboard for Fairy Tails K9 Centre that shows which boarding dogs are stay
 
 The two are deployed separately and communicate over HTTPS:
 - The `.gs` file is pasted into a Google Apps Script project and deployed as a Web App. Its deployment URL + shared `API_TOKEN` are hardcoded into `index.html` (`API_URL`, `API_TOKEN` near the top of the `<script>`). **If you rotate the token or redeploy, update both files.**
-- `index.html` is hosted wherever the TV browser loads it from.
+- `index.html` deploys via **GitHub Pages from `main`** (https://fairytails123.github.io/fooddata/) — pushing `main` IS deploying, so verify before pushing. **The page never reloads itself** (the scheduled refreshes only re-fetch data), so after any frontend deploy the TV browser must be refreshed once by hand or it keeps running the old HTML indefinitely.
 
-There is no local run/build/test/lint tooling. To test the backend, paste it into the Apps Script editor and run `testFeedingBoard()` (logs output via `Logger.log`). To test the frontend, open `index.html` in a browser — it will fetch from the live deployed backend.
+There is no build/lint tooling in the repo. To test the backend, paste it into the Apps Script editor and run `testFeedingBoard()` (logs output via `Logger.log`). To test the frontend, use the headless-Chrome scenario harness at `%TEMP%\ftboard-tests\build_and_run.ps1` (local-only, not committed): it stamps fetch-stubbed copies of the current `index.html` for ~12 scenarios (live replay, 18-dog paging, worst-case med load, offline/stale fallbacks, midnight rollover, XSS), runs each at 1920×1080, and reports assertion JSON (errors, card overflows, chip counts) plus screenshots. Run it after **every** frontend change — this is a safety display. Its `live` scenario replays `live_api_sample.json` from the repo root, which is **gitignored on purpose** (real customer names + medication details must never reach the public Pages site); keep a local copy or refresh it from the live API.
 
 ## Data flow (request → screen)
 
@@ -47,6 +47,8 @@ Tiers 4–5 run **only when tiers 1–3 find nothing** — they rescue otherwise
 **Two appointment types** are merged: `BOARDING_TYPE_NAME` ('dog boarding') and `BOARDING_SCHOOL_TYPE_NAME` ('boarding school'), matched case-insensitively against Acuity type names. Each dog carries `type: 'boarding' | 'school'`, which drives card styling (purple "school" header vs blue).
 
 **Timezone coupling:** both files use `new Date()` and rely on the Apps Script project timezone and the TV browser timezone both being **Europe/London**. Mismatches cause stays to appear/disappear incorrectly around midnight (see the header comment in the `.gs`).
+
+**Card names show dog first name + owner surname** (`buildDogNameHtml` → `.name-first` / `.name-surname` spans, both escaped). Surnames disambiguate same-named dogs (two Rubys with different feeding plans) — never drop them from a card. The name block is a wrapping flex row: both parts share one line when they fit; in narrow grids (g6/g8) the surname wraps to its own full-width line rather than either part being crushed; a part only ellipsizes when it alone is wider than the card. Don't "simplify" this back to a single ellipsized block — that silently truncates the surname first, which is the exact data the layout exists to protect.
 
 **Responsive layout is JS-driven, not CSS media queries.** `calculateLayout(dogCount)` sets CSS custom properties (`--card-cols`, `--fs`, `--notes-clamp`, etc.) on `:root` based on how many dogs there are, scaling font size and grid columns to fit everything on one screen without scrolling. Recent commit history shows repeated tuning of this fit-to-TV behavior — preserve the no-scroll, viewport-unit (`100vh`/`100vw`) approach.
 
