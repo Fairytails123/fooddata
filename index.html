@@ -67,11 +67,17 @@
       background: linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-deep) 70%);
     }
 
+    /* The board is laid out on a fixed 1920x1080 canvas and scaled to the
+       real viewport by JS (fitToScreen). TV browsers often report a smaller
+       CSS viewport (e.g. 1280x720 on Vidaa) than the panel — scaling the
+       whole canvas keeps the design identical on every device. */
     .page {
       display: flex;
       flex-direction: column;
-      width: 100vw;
-      height: 100vh;
+      width: 1920px;
+      height: 1080px;
+      -webkit-transform-origin: 0 0;
+      transform-origin: 0 0;
       /* TV-safe area: ~4% of each edge (overscan) */
       padding: 38px 76px 38px;
     }
@@ -798,7 +804,7 @@
   </style>
 </head>
 <body>
-  <div class="page">
+  <div class="page" id="page">
 
     <div class="header">
       <div class="header-left">
@@ -1653,7 +1659,20 @@
     // ============================================================
     // BOOT
     // ============================================================
+
+    // Scale the fixed 1920x1080 canvas to fill the actual viewport.
+    function fitToScreen() {
+      var sx = (window.innerWidth || 1920) / 1920;
+      var sy = (window.innerHeight || 1080) / 1080;
+      var page = document.getElementById('page');
+      var value = 'scale(' + sx + ', ' + sy + ')';
+      page.style.webkitTransform = value;
+      page.style.transform = value;
+    }
+
     function boot() {
+      fitToScreen();
+      window.addEventListener('resize', fitToScreen);
       // Restore the last good payload so the board is never blank on
       // startup, even if the first fetch fails (e.g. overnight outage).
       try {
