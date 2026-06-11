@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,47 +10,45 @@
   <style>
     /* ============================================================
        Fairy Tails K9 Centre — Boarding Feeding Board
-       Optimised for Hisense 40" 40E4QTUK FHD (1920x1080)
-       No-scroll TV dashboard — all data fits one screen
+       Optimised for Hisense 40" 40E4QTUK FHD (1920x1080), wall-mounted,
+       read by staff from 3-5 metres. Dark theme for distance legibility.
+
+       Layout: header band -> TODAY zone (dominant, paged 4x2 grid)
+               -> TOMORROW strip (compact, single paged row).
+       Dogs beyond tomorrow are filtered out client-side.
+
+       No-scroll TV dashboard — everything fits one 1920x1080 screen.
+       Content kept inside ~4% on every edge for TV overscan.
        ============================================================ */
 
     :root {
-      --ft-primary: #00acee;
-      --ft-primary-dark: #007ba8;
-      --ft-gradient: linear-gradient(135deg, #00acee 0%, #007ba8 100%);
-      --ft-bg: #F0F4F8;
-      --ft-card-bg: #FFFFFF;
-      --ft-text: #1a2332;
-      --ft-text-secondary: #5a6a7e;
-      --ft-border: #e2e8f0;
-      --ft-shadow: 0 1px 6px rgba(0, 60, 100, 0.08);
+      /* Brand family */
+      --ft-navy: #023E8A;
+      --ft-blue: #0077B6;
+      --ft-cyan: #00B4D8;
+      --ft-amber: #FFB703;
+      --ft-amber-deep: #E08D00;
 
-      --ft-kibble: #D97706;
-      --ft-kibble-bg: #FEF3C7;
-      --ft-wet: #0891B2;
-      --ft-wet-bg: #CFFAFE;
-      --ft-tin: #7C3AED;
-      --ft-tin-bg: #EDE9FE;
-      --ft-parent: #059669;
-      --ft-parent-bg: #D1FAE5;
-      --ft-special: #DC2626;
-      --ft-special-bg: #FEE2E2;
+      /* Dark theme surfaces */
+      --bg-deep: #04101E;
+      --bg-mid: #0A2238;
+      --card-bg: #0D2440;
+      --card-bg-2: #102C4E;
 
-      --ft-med-red: #DC2626;
-      --ft-med-red-bg: #FEE2E2;
-      --ft-med-red-border: #FECACA;
-      --ft-no-match: #F59E0B;
-      --ft-no-match-bg: #FFFBEB;
+      /* Text */
+      --text: #F2F7FB;
+      --text-dim: #A7BFD4;
+      --text-faint: #7FA3C0;
 
-      --ft-school: #8B5CF6;
-      --ft-school-dark: #6D28D9;
-      --ft-school-gradient: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+      /* Warnings */
+      --med-red: #D90429;
+      --allergy-amber: #F5A623;
 
-      /* Dynamic layout — set by JS */
-      --card-cols: 4;
-      --card-rows: 2;
-      --card-gap: 10px;
-      --fs: 1;
+      /* School (boarding school) marker */
+      --school: #8B5CF6;
+
+      /* Dynamic — set by JS via layout classes */
+      --tz: 1; /* Today-zone font scale (never below 1) */
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -59,10 +57,14 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
-      background: var(--ft-bg);
-      font-family: 'Nunito', sans-serif;
-      color: var(--ft-text);
+      background: var(--bg-deep);
+      font-family: 'Nunito', 'Segoe UI', sans-serif;
+      color: var(--text);
       -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background: linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-deep) 70%);
     }
 
     .page {
@@ -70,433 +72,691 @@
       flex-direction: column;
       width: 100vw;
       height: 100vh;
-      padding: 16px 40px 10px;
+      /* TV-safe area: ~4% of each edge (overscan) */
+      padding: 38px 76px 38px;
     }
 
-    /* --- Header (compact) --- */
+    /* ============================================================
+       HEADER BAND
+       ============================================================ */
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      gap: 24px;
       flex-shrink: 0;
-      height: 56px;
+      height: 90px;
+      margin-bottom: 12px;
     }
 
     .header-left {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 18px;
+      min-width: 0;
     }
 
     .logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
       object-fit: cover;
+      border: 2px solid rgba(0, 180, 216, 0.4);
+      flex-shrink: 0;
     }
 
     .header-title h1 {
-      font-size: 22px;
+      font-size: 30px;
       font-weight: 900;
-      background: var(--ft-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      line-height: 1.2;
+      color: var(--text);
+      line-height: 1.15;
+      white-space: nowrap;
     }
 
     .header-title .subtitle {
-      font-size: 11px;
+      font-size: 16px;
       font-weight: 700;
-      color: var(--ft-text-secondary);
-      margin-top: 1px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      white-space: nowrap;
+    }
+
+    .header-mid {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .count-pill {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 14px;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .count-pill .count-num { font-size: 30px; }
+
+    .count-pill.today-pill {
+      background: var(--ft-cyan);
+      color: #062C3E;
+    }
+
+    .count-pill.tomorrow-pill {
+      background: var(--ft-amber);
+      color: #3A2A00;
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 22px;
+      flex-shrink: 0;
     }
 
-    .dog-count-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--ft-gradient);
-      color: #fff;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 800;
+    .clock-block { text-align: right; }
+
+    .clock {
+      font-size: 46px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
     }
 
-    .date-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #fff;
-      color: var(--ft-primary-dark);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 12px;
+    .clock-date {
+      font-size: 17px;
       font-weight: 700;
-      border: 2px solid var(--ft-primary);
+      color: var(--text-dim);
+      margin-top: 3px;
     }
 
-    .update-info {
-      font-size: 11px;
-      color: var(--ft-text-secondary);
-      font-weight: 600;
+    .status-block {
       text-align: right;
+      border-left: 2px solid rgba(167, 191, 212, 0.25);
+      padding-left: 22px;
     }
 
-    .status-dot {
-      display: inline-block;
-      width: 7px;
-      height: 7px;
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+    }
+
+    .status-pill .status-dot {
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
-      background: #10B981;
-      margin-right: 3px;
-      animation: pulse 2s ease-in-out infinite;
+      background: #34D399;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+
+    .status-pill.stale {
+      background: rgba(255, 183, 3, 0.18);
+      color: var(--ft-amber);
+    }
+
+    .status-pill.stale .status-dot {
+      background: var(--ft-amber);
+      animation: none;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      50% { opacity: 0.35; }
     }
 
-    /* --- Cards Grid --- */
-    .cards-grid {
+    .status-line {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dim);
+      margin-top: 3px;
+      white-space: nowrap;
+    }
+
+    .status-line .countdown { font-weight: 800; color: var(--ft-cyan); }
+
+    /* ============================================================
+       BANNERS (backend error / feeding warning) — slim, rare
+       ============================================================ */
+    .error-banner {
+      background: rgba(217, 4, 41, 0.16);
+      border: 1px solid rgba(217, 4, 41, 0.45);
+      border-radius: 10px;
+      padding: 7px 16px;
+      margin-bottom: 10px;
+      color: #FFB3BE;
+      font-size: 16px;
+      font-weight: 700;
+      display: none;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .feeding-warning {
+      background: rgba(255, 183, 3, 0.12);
+      border: 1px solid rgba(255, 183, 3, 0.4);
+      border-radius: 10px;
+      padding: 7px 16px;
+      margin-bottom: 10px;
+      color: #FFD477;
+      font-size: 16px;
+      font-weight: 700;
+      display: none;
+      flex-shrink: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ============================================================
+       ZONE BARS (section headers)
+       ============================================================ */
+    .zone-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      margin-bottom: 10px;
+    }
+
+    .zone-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    .zone-title .zone-rule {
+      display: inline-block;
+      width: 46px;
+      height: 5px;
+      border-radius: 3px;
+    }
+
+    .zone-title.today-title { color: var(--ft-cyan); }
+    .zone-title.today-title .zone-rule { background: var(--ft-cyan); }
+
+    .zone-title.tomorrow-title { color: var(--ft-amber); font-size: 19px; }
+    .zone-title.tomorrow-title .zone-rule { background: var(--ft-amber); }
+
+    .page-indicator {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    /* ============================================================
+       TODAY ZONE — dominant, paged grid
+       ============================================================ */
+    .today-zone {
       flex: 1;
-      display: grid;
-      grid-template-columns: repeat(var(--card-cols), minmax(0, 1fr));
-      grid-template-rows: repeat(var(--card-rows, 2), minmax(auto, 1fr));
-      gap: var(--card-gap);
-      align-content: stretch;
-      overflow: hidden;
-      min-height: 0;
-      max-width: 100%;
-    }
-
-    /* --- Dog Card --- */
-    .dog-card {
-      background: var(--ft-card-bg);
-      border-radius: 12px;
-      box-shadow: var(--ft-shadow);
-      overflow: hidden;
       display: flex;
       flex-direction: column;
       min-height: 0;
     }
 
-    .card-header {
-      background: var(--ft-gradient);
-      padding: calc(6px * var(--fs)) calc(10px * var(--fs));
+    .today-grid {
+      flex: 1;
+      display: grid;
+      gap: 16px;
+      min-height: 0;
+      opacity: 1;
+      transition: opacity 0.35s ease;
+    }
+
+    /* Layout classes — fewer dogs = bigger, more luxurious cards.
+       --tz scales card typography and never drops below 1 (the minimums).
+       --notes-clamp keeps long notes from being chopped mid-line. */
+    .today-grid.g1 { grid-template-columns: minmax(0, 1100px); grid-template-rows: minmax(0, 1fr); justify-content: center; --tz: 1.6; --notes-clamp: 6; }
+    .today-grid.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); --tz: 1.5; --notes-clamp: 6; }
+    .today-grid.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); --tz: 1.25; --notes-clamp: 5; }
+    .today-grid.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); --tz: 1.2; --notes-clamp: 3; }
+    .today-grid.g6 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); --tz: 1.08; --notes-clamp: 2; }
+    .today-grid.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); --tz: 1; --notes-clamp: 1; }
+
+    /* At the densest layout the food-type tags duplicate the quantity rows —
+       hide them so the meals chip and notes keep their space. The type pill
+       shrinks and any notes on a medication card give way to the med chip,
+       so nothing is ever chopped mid-line. */
+    .today-grid.g8 .meta-row .food-tag { display: none; }
+    .today-grid.g8 .type-pill { font-size: 14px; padding: 2px 7px; }
+    .today-grid.g8 .tcard-head { padding: 10px 16px 6px; }
+    .today-grid.g8 .tcard-body { gap: 6px; padding: 0 16px 12px; }
+    .today-grid.g8 .tcard.has-med .notes-block { display: none; }
+
+    /* ============================================================
+       TODAY CARD
+       ============================================================ */
+    .tcard {
+      background: linear-gradient(150deg, var(--card-bg-2) 0%, var(--card-bg) 60%);
+      border: 1px solid rgba(0, 180, 216, 0.35);
+      border-left: 10px solid var(--ft-cyan);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .tcard-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 6px;
+      gap: 12px;
+      padding: calc(12px * var(--tz)) calc(18px * var(--tz)) calc(8px * var(--tz));
       flex-shrink: 0;
     }
 
-    .card-header.school {
-      background: var(--ft-school-gradient);
-    }
-
-    .card-header .dog-identity {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .tcard-name {
+      flex: 1 1 auto;
+      font-size: calc(48px * var(--tz));
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       min-width: 0;
     }
 
-    .card-header .paw-icon {
-      width: calc(26px * var(--fs));
-      height: calc(26px * var(--fs));
-      background: rgba(255,255,255,0.2);
-      border-radius: 8px;
-      display: flex;
+    /* Sits OUTSIDE the name block so a long name never swallows it */
+    .type-pill {
+      display: inline-block;
+      font-size: calc(16px * var(--tz));
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: calc(2px * var(--tz)) calc(9px * var(--tz));
+      border-radius: 7px;
+      background: rgba(0, 119, 182, 0.45);
+      color: #BDE6F5;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .type-pill.school {
+      background: rgba(139, 92, 246, 0.4);
+      color: #D6C5FB;
+    }
+
+    /* Meals chip lives in the card body's meta row */
+    .meals-pill {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
+      font-size: calc(24px * var(--tz));
+      font-weight: 800;
+      color: var(--ft-cyan);
+      background: rgba(0, 180, 216, 0.14);
+      border: 1px solid rgba(0, 180, 216, 0.4);
+      padding: calc(3px * var(--tz)) calc(11px * var(--tz));
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: calc(8px * var(--tz));
       flex-shrink: 0;
     }
 
-    .card-header .paw-icon svg {
-      width: calc(15px * var(--fs));
-      height: calc(15px * var(--fs));
-      fill: #fff;
+    .day-badge {
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      border-radius: 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
-    .card-header .dog-name {
-      font-size: calc(15px * var(--fs));
+    .day-badge.today-badge {
+      font-size: calc(24px * var(--tz));
+      padding: calc(6px * var(--tz)) calc(14px * var(--tz));
+      background: var(--ft-cyan);
+      color: #062C3E;
+    }
+
+    .day-badge.tomorrow-badge {
+      background: var(--ft-amber);
+      color: #3A2A00;
+    }
+
+    .tcard-body {
+      display: flex;
+      flex-direction: column;
+      gap: calc(8px * var(--tz));
+      padding: 0 calc(18px * var(--tz)) calc(14px * var(--tz));
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Medication chip — first in the body so it is never clipped */
+    .med-chip {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--med-red);
+      border-radius: 10px;
+      padding: calc(8px * var(--tz)) calc(12px * var(--tz));
+      flex-shrink: 0;
+    }
+
+    .med-chip svg {
+      width: calc(28px * var(--tz));
+      height: calc(28px * var(--tz));
+      fill: #fff;
+      flex-shrink: 0;
+      margin-top: calc(3px * var(--tz));
+    }
+
+    .med-chip .med-text {
+      font-size: calc(28px * var(--tz));
       font-weight: 800;
       color: #fff;
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .med-chip .med-text .med-label { text-transform: uppercase; letter-spacing: 1px; }
+
+    .allergy-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--allergy-amber);
+      border-radius: 10px;
+      padding: calc(7px * var(--tz)) calc(12px * var(--tz));
+      flex-shrink: 0;
+    }
+
+    .allergy-chip svg {
+      width: calc(26px * var(--tz));
+      height: calc(26px * var(--tz));
+      fill: #3A2A00;
+      flex-shrink: 0;
+    }
+
+    .allergy-chip .allergy-text {
+      font-size: calc(26px * var(--tz));
+      font-weight: 900;
+      color: #3A2A00;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Quantity rows — the core feeding details */
+    .qty-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: calc(6px * var(--tz)) calc(12px * var(--tz));
+      background: rgba(255, 255, 255, 0.055);
+      border-left: 5px solid var(--ft-blue);
+      border-radius: 8px;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+
+    .qty-label {
+      font-size: calc(20px * var(--tz));
+      font-weight: 800;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.2;
+      min-width: calc(80px * var(--tz));
+      flex-shrink: 0;
+    }
+
+    .qty-value {
+      font-size: calc(30px * var(--tz));
+      font-weight: 800;
+      color: var(--text);
       line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
     }
 
-    .card-type-badge {
-      display: inline-block;
-      font-size: calc(8px * var(--fs));
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      padding: 1px 5px;
-      border-radius: 4px;
-      background: rgba(255,255,255,0.25);
-      color: #fff;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-
-    .meals-badge {
-      background: rgba(255,255,255,0.2);
-      color: #fff;
-      padding: calc(3px * var(--fs)) calc(8px * var(--fs));
-      border-radius: 12px;
-      font-size: calc(10px * var(--fs));
-      font-weight: 800;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .card-body {
-      padding: calc(var(--card-pad, 6px) * var(--fs)) calc(8px * var(--fs)) calc(var(--card-pad, 6px) * var(--fs));
-      display: flex;
-      flex-direction: column;
-      gap: calc(3px * var(--fs));
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      scrollbar-width: none;
-    }
-    .card-body::-webkit-scrollbar { display: none; }
-
-    /* Food tags */
-    .food-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: calc(4px * var(--fs));
-    }
-
+    /* Food type tags — supplementary, shown in the meta row */
     .food-tag {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
-      padding: calc(2px * var(--fs)) calc(7px * var(--fs));
-      border-radius: 6px;
-      font-size: calc(10px * var(--fs));
+      gap: 6px;
+      padding: calc(3px * var(--tz)) calc(11px * var(--tz));
+      border-radius: 8px;
+      font-size: calc(24px * var(--tz));
       font-weight: 700;
+      white-space: nowrap;
     }
 
     .food-tag svg {
-      width: calc(12px * var(--fs));
-      height: calc(12px * var(--fs));
+      width: calc(20px * var(--tz));
+      height: calc(20px * var(--tz));
       flex-shrink: 0;
     }
 
-    .food-tag.kibble { background: var(--ft-kibble-bg); color: var(--ft-kibble); }
-    .food-tag.wet { background: var(--ft-wet-bg); color: var(--ft-wet); }
-    .food-tag.tin { background: var(--ft-tin-bg); color: var(--ft-tin); }
-    .food-tag.parent { background: var(--ft-parent-bg); color: var(--ft-parent); }
-    .food-tag.special { background: var(--ft-special-bg); color: var(--ft-special); }
+    .food-tag.kibble { background: rgba(217, 119, 6, 0.22); color: #FBBF77; }
+    .food-tag.wet { background: rgba(8, 145, 178, 0.25); color: #7DE3F4; }
+    .food-tag.tin { background: rgba(124, 58, 237, 0.25); color: #C9B2F8; }
+    .food-tag.parent { background: rgba(5, 150, 105, 0.25); color: #6EE7B7; }
+    .food-tag.special { background: rgba(220, 38, 38, 0.22); color: #FCA5A5; }
 
-    /* Quantity rows */
-    .quantity-row {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-      padding: calc(4px * var(--fs)) calc(8px * var(--fs));
-      background: #F8FAFC;
-      border-radius: 6px;
-      border-left: 3px solid var(--ft-primary);
+    /* Notes — clipped last (lowest priority in body order) */
+    .notes-block {
+      padding: calc(6px * var(--tz)) calc(12px * var(--tz));
+      background: rgba(255, 183, 3, 0.09);
+      border-left: 5px solid var(--ft-amber-deep);
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 0;
     }
 
-    .quantity-label {
-      font-size: calc(9px * var(--fs));
-      font-weight: 700;
-      color: var(--ft-text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      min-width: 48px;
-    }
-
-    .quantity-value {
-      font-size: calc(12px * var(--fs));
+    .notes-label {
+      font-size: calc(15px * var(--tz));
       font-weight: 800;
-      color: var(--ft-text);
+      color: var(--ft-amber);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 2px;
+    }
+
+    .notes-text {
+      font-size: calc(28px * var(--tz));
+      font-weight: 600;
+      color: #F4E3B2;
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: var(--notes-clamp, 2);
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Unmatched dog — no feeding record found */
+    .no-match-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: calc(10px * var(--tz)) calc(14px * var(--tz));
+      background: rgba(255, 183, 3, 0.1);
+      border: 2px dashed rgba(255, 183, 3, 0.5);
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .no-match-banner svg {
+      width: calc(28px * var(--tz));
+      height: calc(28px * var(--tz));
+      fill: var(--ft-amber);
+      flex-shrink: 0;
+    }
+
+    .no-match-banner .no-match-text {
+      font-size: calc(28px * var(--tz));
+      font-weight: 800;
+      color: var(--ft-amber);
+    }
+
+    /* ============================================================
+       TOMORROW STRIP — compact, clearly separated
+       ============================================================ */
+    .tomorrow-zone {
+      flex-shrink: 0;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 2px solid rgba(255, 183, 3, 0.35);
+    }
+
+    .tomorrow-grid {
+      display: grid;
+      gap: 14px;
+      height: 168px;
+      opacity: 1;
+      transition: opacity 0.35s ease;
+    }
+
+    .tomorrow-grid.s1 { grid-template-columns: minmax(0, 560px); }
+    .tomorrow-grid.s2 { grid-template-columns: repeat(2, minmax(0, 560px)); }
+    .tomorrow-grid.s3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tomorrow-grid.s4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .tomorrow-grid.s5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+    .scard {
+      background: linear-gradient(150deg, #1C2236 0%, #141B2C 60%);
+      border: 1px solid rgba(255, 183, 3, 0.4);
+      border-left: 8px solid var(--ft-amber);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .scard-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .scard-name {
+      flex: 1 1 auto;
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .scard .type-pill {
+      font-size: 13px;
+      padding: 1px 7px;
+    }
+
+    .scard .day-badge.tomorrow-badge {
+      font-size: 19px;
+      padding: 4px 11px;
+      flex-shrink: 0;
+    }
+
+    .scard-line {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-dim);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    /* Notes — clamped */
-    .notes-block {
-      padding: calc(4px * var(--fs)) calc(8px * var(--fs));
-      background: #FFFBEB;
-      border-radius: 6px;
-      border-left: 3px solid #F59E0B;
-      overflow: hidden;
+    .scard-line .scard-meals { color: var(--ft-cyan); font-weight: 800; }
+
+    .scard .med-chip {
+      padding: 5px 10px;
+      gap: 8px;
+      align-items: center;
+      margin-top: auto;
     }
 
-    .notes-label {
-      font-size: calc(8px * var(--fs));
-      font-weight: 800;
-      color: #92400E;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      margin-bottom: 1px;
+    .scard .med-chip svg { width: 20px; height: 20px; margin-top: 0; }
+
+    .scard .med-chip .med-text {
+      font-size: 20px;
+      -webkit-line-clamp: 1;
     }
 
-    .notes-text {
-      font-size: calc(10px * var(--fs));
-      font-weight: 600;
-      color: #78350F;
-      line-height: 1.3;
-      display: -webkit-box;
-      -webkit-line-clamp: var(--notes-clamp, 3);
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
+    .scard .no-match-banner { padding: 6px 10px; margin-top: auto; }
+    .scard .no-match-banner svg { width: 20px; height: 20px; }
+    .scard .no-match-banner .no-match-text { font-size: 20px; }
 
-    /* Medication — compact */
-    .med-alert {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      padding: calc(5px * var(--fs)) calc(8px * var(--fs));
-      background: var(--ft-med-red-bg);
-      border: 2px solid var(--ft-med-red-border);
-      border-radius: 8px;
-    }
+    /* At 4-5 strip cards the badge slims down and the type pill goes,
+       so names always stay legible (the zone header still says TOMORROW). */
+    .tomorrow-grid.s4 .type-pill, .tomorrow-grid.s5 .type-pill { display: none; }
+    .tomorrow-grid.s4 .day-badge.tomorrow-badge,
+    .tomorrow-grid.s5 .day-badge.tomorrow-badge { font-size: 16px; padding: 3px 9px; letter-spacing: 1px; }
 
-    .med-alert-icon {
-      width: calc(20px * var(--fs));
-      height: calc(20px * var(--fs));
-      background: var(--ft-med-red);
-      border-radius: 5px;
-      display: flex;
+    /* Zone-level empty messages */
+    .zone-empty {
+      display: none;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .med-alert-icon svg {
-      width: calc(13px * var(--fs));
-      height: calc(13px * var(--fs));
-      fill: #fff;
-    }
-
-    .med-alert-content { flex: 1; min-width: 0; }
-
-    .med-alert-title {
-      font-size: calc(10px * var(--fs));
-      font-weight: 800;
-      color: var(--ft-med-red);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
-
-    .med-alert-text {
-      font-size: calc(9px * var(--fs));
-      font-weight: 600;
-      color: #991B1B;
-      line-height: 1.3;
-      margin-top: 1px;
-    }
-
-    /* No match */
-    .no-match-banner {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: calc(6px * var(--fs)) calc(8px * var(--fs));
-      background: var(--ft-no-match-bg);
-      border: 1px dashed #FCD34D;
-      border-radius: 8px;
-    }
-
-    .no-match-banner svg {
-      width: calc(16px * var(--fs));
-      height: calc(16px * var(--fs));
-      fill: var(--ft-no-match);
-      flex-shrink: 0;
-    }
-
-    .no-match-banner .no-match-text {
-      font-size: calc(11px * var(--fs));
+      color: var(--text-faint);
+      font-size: 26px;
       font-weight: 700;
-      color: #92400E;
     }
 
-    /* Error / Warning banners */
-    .error-banner {
-      background: #FEF2F2;
-      border: 1px solid #FECACA;
-      border-radius: 8px;
-      padding: 8px 16px;
-      margin-bottom: 8px;
-      color: #991B1B;
-      font-size: 12px;
-      font-weight: 600;
-      display: none;
-      flex-shrink: 0;
-    }
+    .today-zone .zone-empty { flex: 1; }
+    .tomorrow-zone .zone-empty { height: 168px; }
 
-    .feeding-warning {
-      background: #FFFBEB;
-      border: 1px solid #FCD34D;
-      border-radius: 8px;
-      padding: 8px 16px;
-      margin-bottom: 8px;
-      color: #92400E;
-      font-size: 12px;
-      font-weight: 600;
-      display: none;
-      flex-shrink: 0;
-    }
-
-    /* Footer */
-    .footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 8px;
-      padding-top: 6px;
-      border-top: 1px solid var(--ft-border);
-      flex-shrink: 0;
-      height: 28px;
-    }
-
-    .footer-left, .footer-right {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--ft-text-secondary);
-    }
-
-    .countdown {
-      font-weight: 800;
-      color: var(--ft-primary);
-    }
-
-    /* Loading */
+    /* ============================================================
+       LOADING / EMPTY / ERROR STATES
+       ============================================================ */
     .loading-overlay {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       flex: 1;
-      gap: 16px;
+      gap: 20px;
     }
 
     .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--ft-border);
-      border-top-color: var(--ft-primary);
+      width: 56px;
+      height: 56px;
+      border: 4px solid rgba(167, 191, 212, 0.2);
+      border-top-color: var(--ft-cyan);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -504,24 +764,37 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .loading-text {
-      font-size: 14px;
+      font-size: 24px;
       font-weight: 700;
-      color: var(--ft-text-secondary);
+      color: var(--text-dim);
     }
 
-    /* Empty */
     .empty-state {
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       flex: 1;
-      gap: 12px;
-      color: var(--ft-text-secondary);
+      gap: 18px;
+      color: var(--text-dim);
     }
 
-    .empty-state svg { width: 48px; height: 48px; opacity: 0.4; }
-    .empty-state p { font-size: 16px; font-weight: 700; }
+    .empty-state svg { width: 84px; height: 84px; opacity: 0.4; fill: var(--ft-cyan); }
+    .empty-state p { font-size: 32px; font-weight: 800; }
+    .empty-state .empty-sub { font-size: 20px; font-weight: 600; color: var(--text-faint); }
+
+    .offline-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 16px;
+    }
+
+    .offline-state svg { width: 72px; height: 72px; fill: var(--ft-amber); opacity: 0.8; }
+    .offline-state p { font-size: 30px; font-weight: 800; color: var(--text); }
+    .offline-state .offline-sub { font-size: 20px; font-weight: 600; color: var(--text-dim); }
   </style>
 </head>
 <body>
@@ -529,24 +802,25 @@
 
     <div class="header">
       <div class="header-left">
-        <img src="https://i.ibb.co/whdBKp0L/Logo-1.jpg" alt="Fairy Tails K9 Centre" class="logo">
+        <img src="assets/img/logo.jpg" alt="Fairy Tails K9 Centre" class="logo" onerror="this.style.display='none'">
         <div class="header-title">
           <h1>Boarding Feeding Board</h1>
           <div class="subtitle">Today's stays &amp; tomorrow's arrivals</div>
         </div>
       </div>
+      <div class="header-mid">
+        <div class="count-pill today-pill"><span class="count-num" id="todayCount">—</span> TODAY</div>
+        <div class="count-pill tomorrow-pill"><span class="count-num" id="tomorrowCount">—</span> TOMORROW</div>
+      </div>
       <div class="header-right">
-        <div class="dog-count-badge" id="dogCountBadge">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="8" cy="6.5" rx="2.2" ry="2.8"/><ellipse cx="16" cy="6.5" rx="2.2" ry="2.8"/><ellipse cx="4.5" cy="11.5" rx="2" ry="2.5"/><ellipse cx="19.5" cy="11.5" rx="2" ry="2.5"/><path d="M12 22c-3.5 0-6.5-2.5-7-5.5-.3-1.8.5-3.5 2-4.5 1-.7 2.2-1 3.3-1h3.4c1.1 0 2.3.3 3.3 1 1.5 1 2.3 2.7 2 4.5-.5 3-3.5 5.5-7 5.5z"/></svg>
-          <span id="dogCountText">— Dogs</span>
+        <div class="clock-block">
+          <div class="clock" id="clock">--:--</div>
+          <div class="clock-date" id="clockDate">—</div>
         </div>
-        <div class="date-badge" id="dateRangeBadge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span id="dateRangeText">Loading...</span>
-        </div>
-        <div class="update-info">
-          <span class="status-dot"></span>
-          Updated: <span id="lastUpdated">—</span>
+        <div class="status-block">
+          <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">LIVE</span></div>
+          <div class="status-line">Updated: <span id="lastUpdated">—</span></div>
+          <div class="status-line">Next refresh: <span class="countdown" id="countdown">—</span></div>
         </div>
       </div>
     </div>
@@ -556,19 +830,37 @@
 
     <div class="loading-overlay" id="loadingState">
       <div class="spinner"></div>
-      <div class="loading-text">Fetching boarding &amp; feeding data...</div>
+      <div class="loading-text">Fetching boarding &amp; feeding data&hellip;</div>
     </div>
 
-    <div class="cards-grid" id="cardsGrid" style="display:none;"></div>
-
-    <div class="empty-state" id="emptyState" style="display:none;">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-      <p>No boarding stays in the next 7 days</p>
+    <div class="empty-state" id="emptyState">
+      <svg viewBox="0 0 24 24"><ellipse cx="8" cy="6.5" rx="2.2" ry="2.8"/><ellipse cx="16" cy="6.5" rx="2.2" ry="2.8"/><ellipse cx="4.5" cy="11.5" rx="2" ry="2.5"/><ellipse cx="19.5" cy="11.5" rx="2" ry="2.5"/><path d="M12 22c-3.5 0-6.5-2.5-7-5.5-.3-1.8.5-3.5 2-4.5 1-.7 2.2-1 3.3-1h3.4c1.1 0 2.3.3 3.3 1 1.5 1 2.3 2.7 2 4.5-.5 3-3.5 5.5-7 5.5z"/></svg>
+      <p>No dogs boarding today or arriving tomorrow</p>
+      <div class="empty-sub">The board refreshes automatically at 07:00, 13:00 and 18:00</div>
     </div>
 
-    <div class="footer">
-      <div class="footer-left">Fairy Tails K9 Centre — Boarding Feeding Board</div>
-      <div class="footer-right">Next refresh in: <span class="countdown" id="countdown">—</span></div>
+    <div class="offline-state" id="offlineState">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      <p>Unable to load boarding data</p>
+      <div class="offline-sub" id="offlineSub">Retrying shortly&hellip;</div>
+    </div>
+
+    <div class="today-zone" id="todayZone" style="display:none;">
+      <div class="zone-bar">
+        <div class="zone-title today-title"><span class="zone-rule"></span>STAYING TODAY</div>
+        <div class="page-indicator" id="todayPageIndicator"></div>
+      </div>
+      <div class="today-grid" id="todayGrid"></div>
+      <div class="zone-empty" id="todayEmpty">No dogs boarding today</div>
+    </div>
+
+    <div class="tomorrow-zone" id="tomorrowZone" style="display:none;">
+      <div class="zone-bar">
+        <div class="zone-title tomorrow-title"><span class="zone-rule"></span>ARRIVING TOMORROW</div>
+        <div class="page-indicator" id="tomorrowPageIndicator"></div>
+      </div>
+      <div class="tomorrow-grid" id="tomorrowGrid"></div>
+      <div class="zone-empty" id="tomorrowEmpty">No new arrivals tomorrow</div>
     </div>
 
   </div>
@@ -584,32 +876,69 @@
     // Three calls a day keeps us well under Acuity's bandwidth quota and matches
     // the shift boundaries when feeding info actually needs to be read.
     var SCHEDULED_REFRESH_HOURS = [7, 13, 18];
-    var nextRefreshTime = null;
-    var countdownTimer = null;
+
+    // A failed fetch retries after this many minutes rather than waiting for the
+    // next scheduled slot. The backend serves from its own cache / stale fallback,
+    // so retries do not hit Acuity's quota.
+    var RETRY_MINUTES = 10;
+
+    // A fetch that never settles (stalled connection, TV Wi-Fi drop mid-response)
+    // is abandoned after this long so refreshes can never be wedged permanently.
+    var FETCH_TIMEOUT_MS = 90 * 1000;
+
+    // Page cycling rhythm for both zones (seconds per page).
+    var PAGE_SECONDS = 12;
+    var FADE_MS = 360;
+
+    // Per-page capacities. Today: 4 cols x 2 rows keeps the 48px-name minimum.
+    var TODAY_PER_PAGE = 8;
+    var TOMORROW_PER_PAGE = 5;
+
+    var CACHE_KEY = 'ftFeedingBoardLastGood';
 
     var DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     var MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+    // ============================================================
+    // STATE — single source of truth, one master timer (no stacking)
+    // ============================================================
+    var state = {
+      lastGoodData: null,     // last successfully fetched API payload
+      haveLiveFetch: false,   // true once this page-load has fetched successfully
+      fetchFailed: false,     // last fetch attempt failed
+      lastFetchError: '',     // human-readable reason shown while stale
+      fetching: false,
+      fetchStartedAt: 0,      // watchdog: when the in-flight fetch began
+      fetchSeq: 0,            // watchdog: invalidates abandoned fetches
+      nextRefreshTime: null,
+      dayStamp: '',           // 'YYYY-MM-DD' — change triggers midnight re-classification
+      todayDogs: [],
+      tomorrowDogs: [],
+      todayPage: 0,
+      tomorrowPage: 0,
+      todayPages: 1,
+      tomorrowPages: 1,
+      cycleSeconds: 0,
+      todayFadeTimer: null,
+      tomorrowFadeTimer: null
+    };
+
+    // Wrapped so the clock source is a single seam (and testable).
+    function nowDate() { return new Date(); }
 
     // ============================================================
     // DATE HELPERS
     // ============================================================
-
-    function parseDate(dateStr) {
-      var parts = dateStr.split('-');
-      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    }
-
-    function formatDateRange(start, end) {
-      var s = parseDate(start);
-      var e = parseDate(end);
-      return s.getDate() + ' ' + MONTH_NAMES[s.getMonth()] + ' — ' +
-             e.getDate() + ' ' + MONTH_NAMES[e.getMonth()] + ' ' + e.getFullYear();
+    function dateStamp(d) {
+      return d.getFullYear() + '-' +
+        ('0' + (d.getMonth() + 1)).slice(-2) + '-' +
+        ('0' + d.getDate()).slice(-2);
     }
 
     function formatLastUpdated(isoStr) {
       var d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '—';
       var hours = d.getHours();
       var mins = ('0' + d.getMinutes()).slice(-2);
       var ampm = hours >= 12 ? 'pm' : 'am';
@@ -624,42 +953,91 @@
       return div.innerHTML;
     }
 
-
     // ============================================================
-    // DEDUPLICATION
+    // CLASSIFICATION — today vs tomorrow, derived client-side
     // ============================================================
 
-    function deduplicateDogs(dogs) {
+    /**
+     * Splits dogs into today's stays and tomorrow's arrivals.
+     * - "Staying today": checkIn <= today AND checkOut > today
+     * - "Arriving tomorrow": checkIn == tomorrow (and not already staying —
+     *   a dog both boarding now and staying tomorrow counts as TODAY)
+     * Dogs whose stay starts after tomorrow are dropped from the display.
+     * Recomputed on every render so the board rolls over at midnight.
+     */
+    function classifyDogs(dogs) {
+      var now = nowDate();
+      var todayStr = dateStamp(now);
+      var tomorrow = new Date(now.getTime());
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      var tomorrowStr = dateStamp(tomorrow);
+
+      var tagged = [];
+      for (var i = 0; i < dogs.length; i++) {
+        var dog = dogs[i];
+        if (!dog || !dog.checkIn || !dog.checkOut) continue;
+        var stayingToday = (dog.checkIn <= todayStr && dog.checkOut > todayStr);
+        var arrivingTomorrow = (dog.checkIn === tomorrowStr);
+        if (stayingToday) {
+          tagged.push({ dog: dog, zone: 'today' });
+        } else if (arrivingTomorrow) {
+          tagged.push({ dog: dog, zone: 'tomorrow' });
+        }
+        // Anything else (already gone, or arriving after tomorrow) is hidden.
+      }
+
+      var deduped = deduplicateTagged(tagged);
+
+      var todayDogs = [];
+      var tomorrowDogs = [];
+      for (var j = 0; j < deduped.length; j++) {
+        if (deduped[j].zone === 'today') todayDogs.push(deduped[j].dog);
+        else tomorrowDogs.push(deduped[j].dog);
+      }
+      return { today: todayDogs, tomorrow: tomorrowDogs };
+    }
+
+    /**
+     * De-duplicates dogs (same name + surname) across both zones, preserving
+     * backend order (medication dogs first). Priority when records collide:
+     * today-zone beats tomorrow-zone, then medication, then matched,
+     * then the later check-in.
+     */
+    function deduplicateTagged(tagged) {
       var seen = {};
       var result = [];
 
-      for (var i = 0; i < dogs.length; i++) {
-        var dog = dogs[i];
+      for (var i = 0; i < tagged.length; i++) {
+        var entry = tagged[i];
+        var dog = entry.dog;
         var key = (dog.dogName || '').toLowerCase() + '|' + (dog.ownerSurname || '').toLowerCase();
 
         if (!seen[key]) {
-          seen[key] = { index: result.length, dog: dog };
-          result.push(dog);
+          seen[key] = { index: result.length, entry: entry };
+          result.push(entry);
         } else {
-          var existing = seen[key].dog;
+          var existing = seen[key].entry;
           var replaceExisting = false;
 
-          var existingHasMed = existing.feeding && existing.feeding.medication === 'Yes';
-          var newHasMed = dog.feeding && dog.feeding.medication === 'Yes';
-
-          if (!existingHasMed && newHasMed) {
+          if (existing.zone === 'tomorrow' && entry.zone === 'today') {
             replaceExisting = true;
-          } else if (existingHasMed === newHasMed) {
-            if (!existing.matched && dog.matched) {
+          } else if (existing.zone === entry.zone) {
+            var existingHasMed = existing.dog.feeding && existing.dog.feeding.medication === 'Yes';
+            var newHasMed = dog.feeding && dog.feeding.medication === 'Yes';
+            if (!existingHasMed && newHasMed) {
               replaceExisting = true;
-            } else if (existing.matched === dog.matched && dog.checkIn > existing.checkIn) {
-              replaceExisting = true;
+            } else if (existingHasMed === newHasMed) {
+              if (!existing.dog.matched && dog.matched) {
+                replaceExisting = true;
+              } else if (existing.dog.matched === dog.matched && dog.checkIn > existing.dog.checkIn) {
+                replaceExisting = true;
+              }
             }
           }
 
           if (replaceExisting) {
-            result[seen[key].index] = dog;
-            seen[key].dog = dog;
+            result[seen[key].index] = entry;
+            seen[key].entry = entry;
           }
         }
       }
@@ -667,129 +1045,9 @@
       return result;
     }
 
-
-    // ============================================================
-    // TODAY + TOMORROW FILTER
-    // ============================================================
-
-    /**
-     * Filters dogs to only those staying today or arriving tomorrow.
-     * - "Staying today": checkIn <= today AND checkOut > today
-     * - "Arriving tomorrow": checkIn == tomorrow
-     * Dogs whose stay starts after tomorrow are excluded.
-     */
-    function filterTodayTomorrow(dogs) {
-      var now = new Date();
-      var todayStr = now.getFullYear() + '-' +
-        ('0' + (now.getMonth() + 1)).slice(-2) + '-' +
-        ('0' + now.getDate()).slice(-2);
-
-      var tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      var tomorrowStr = tomorrow.getFullYear() + '-' +
-        ('0' + (tomorrow.getMonth() + 1)).slice(-2) + '-' +
-        ('0' + tomorrow.getDate()).slice(-2);
-
-      var result = [];
-      for (var i = 0; i < dogs.length; i++) {
-        var dog = dogs[i];
-        var checkIn = dog.checkIn;
-        var checkOut = dog.checkOut;
-
-        // Currently staying today (checked in on or before today, checks out after today)
-        var stayingToday = (checkIn <= todayStr && checkOut > todayStr);
-
-        // Arriving tomorrow
-        var arrivingTomorrow = (checkIn === tomorrowStr);
-
-        if (stayingToday || arrivingTomorrow) {
-          // Tag the dog so the card can show context
-          dog._arrivalLabel = arrivingTomorrow && !stayingToday ? 'tomorrow' : 'today';
-          result.push(dog);
-        }
-      }
-
-      return result;
-    }
-
-    /**
-     * Formats "Today & Tomorrow" date label for the header badge.
-     */
-    function formatTodayTomorrow() {
-      var now = new Date();
-      var tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return 'Today ' + now.getDate() + ' ' + MONTH_NAMES[now.getMonth()] +
-             ' + Tomorrow ' + tomorrow.getDate() + ' ' + MONTH_NAMES[tomorrow.getMonth()];
-    }
-
-
-    // ============================================================
-    // DYNAMIC LAYOUT CALCULATION
-    // ============================================================
-
-    function calculateLayout(dogCount) {
-      var cols, gap, fs;
-
-      if (dogCount <= 2) {
-        cols = 2; gap = 14; fs = 1.15;
-      } else if (dogCount <= 4) {
-        cols = 2; gap = 12; fs = 1.1;
-      } else if (dogCount <= 6) {
-        cols = 3; gap = 12; fs = 1.05;
-      } else if (dogCount <= 9) {
-        cols = 3; gap = 10; fs = 1.0;
-      } else if (dogCount <= 12) {
-        cols = 4; gap = 10; fs = 0.95;
-      } else if (dogCount <= 16) {
-        cols = 4; gap = 8; fs = 0.85;
-      } else if (dogCount <= 20) {
-        cols = 5; gap = 8; fs = 0.8;
-      } else if (dogCount <= 25) {
-        cols = 5; gap = 7; fs = 0.75;
-      } else {
-        cols = 6; gap = 6; fs = 0.7;
-      }
-
-      // Safety check: ensure cards have at least ~120px height
-      var viewportHeight = window.innerHeight || 1080;
-      var availableHeight = viewportHeight - 56 - 28 - 26 - 42; // header + footer + padding + gaps
-      var rows = Math.ceil(dogCount / cols);
-      var cardHeight = (availableHeight - (rows - 1) * gap) / rows;
-      if (cardHeight < 120 && cols < 6) {
-        cols++;
-        rows = Math.ceil(dogCount / cols);
-        fs = Math.max(fs - 0.05, 0.65);
-      }
-
-      // Dynamic notes clamp and card padding based on dog count
-      var notesClamp = dogCount <= 6 ? 99 : dogCount <= 12 ? 3 : 2;
-      var cardPad = dogCount <= 6 ? 6 : dogCount <= 12 ? 4 : 3;
-
-      var root = document.documentElement;
-      root.style.setProperty('--card-cols', cols);
-      root.style.setProperty('--card-rows', rows);
-      root.style.setProperty('--card-gap', gap + 'px');
-      root.style.setProperty('--fs', fs);
-      root.style.setProperty('--notes-clamp', notesClamp);
-      root.style.setProperty('--card-pad', cardPad + 'px');
-
-      return { cols: cols, rows: rows, gap: gap, fs: fs };
-    }
-
-
     // ============================================================
     // SVG ICONS
     // ============================================================
-
-    function pawIconSVG() {
-      return '<svg viewBox="0 0 24 24"><ellipse cx="8" cy="6.5" rx="2.2" ry="2.8"/>' +
-        '<ellipse cx="16" cy="6.5" rx="2.2" ry="2.8"/>' +
-        '<ellipse cx="4.5" cy="11.5" rx="2" ry="2.5"/>' +
-        '<ellipse cx="19.5" cy="11.5" rx="2" ry="2.5"/>' +
-        '<path d="M12 22c-3.5 0-6.5-2.5-7-5.5-.3-1.8.5-3.5 2-4.5 1-.7 2.2-1 3.3-1h3.4c1.1 0 2.3.3 3.3 1 1.5 1 2.3 2.7 2 4.5-.5 3-3.5 5.5-7 5.5z"/></svg>';
-    }
-
     var FOOD_TYPE_MAP = {
       'Kibble': {
         cls: 'kibble', label: 'Kibble',
@@ -815,65 +1073,13 @@
 
     var medIconSVG = '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>';
     var warningIconSVG = '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
-
+    var allergyIconSVG = '<svg viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 4l7.5 13h-15L12 6zm-1 6v4h2v-4h-2zm0 5v2h2v-2h-2z"/></svg>';
 
     // ============================================================
     // CARD BUILDERS
     // ============================================================
-
     function getTypeBadgeLabel(type) {
       return type === 'school' ? 'School' : 'Holiday';
-    }
-
-    function buildFoodTags(foodTypes) {
-      if (!foodTypes || foodTypes.length === 0) return '';
-      var html = '<div class="food-tags">';
-      for (var i = 0; i < foodTypes.length; i++) {
-        var type = foodTypes[i];
-        var info = FOOD_TYPE_MAP[type];
-        if (info) {
-          html += '<span class="food-tag ' + info.cls + '">' + info.icon + escapeHtml(info.label) + '</span>';
-        } else {
-          html += '<span class="food-tag special">' + FOOD_TYPE_MAP['Special Requirements'].icon + escapeHtml(type) + '</span>';
-        }
-      }
-      return html + '</div>';
-    }
-
-    function buildQuantityRows(feeding) {
-      var html = '';
-      if (feeding.kibbleSummary) {
-        html += '<div class="quantity-row"><span class="quantity-label">Kibble</span><span class="quantity-value">' + escapeHtml(feeding.kibbleSummary) + '</span></div>';
-      }
-      if (feeding.wetFood) {
-        html += '<div class="quantity-row"><span class="quantity-label">Wet</span><span class="quantity-value">' + escapeHtml(feeding.wetFood) + '</span></div>';
-      }
-      if (feeding.tinFood) {
-        html += '<div class="quantity-row"><span class="quantity-label">Tin</span><span class="quantity-value">' + escapeHtml(feeding.tinFood) + '</span></div>';
-      }
-      return html;
-    }
-
-    function buildNotesBlock(notes) {
-      if (!notes) return '';
-      return '<div class="notes-block"><div class="notes-label">Notes</div><div class="notes-text">' + escapeHtml(notes) + '</div></div>';
-    }
-
-    function buildMedAlert(feeding) {
-      if (!feeding || feeding.medication !== 'Yes') return '';
-      var details = feeding.medicationDetails || 'See medication bag / check with owner';
-      return '<div class="med-alert">' +
-               '<div class="med-alert-icon">' + medIconSVG + '</div>' +
-               '<div class="med-alert-content">' +
-                 '<div class="med-alert-title">\u2695 Medication Required</div>' +
-                 '<div class="med-alert-text">' + escapeHtml(details) + '</div>' +
-               '</div>' +
-             '</div>';
-    }
-
-    function buildNoMatchBanner() {
-      return '<div class="no-match-banner">' + warningIconSVG +
-             '<span class="no-match-text">No feeding record — check JotForm</span></div>';
     }
 
     function formatMealsBadge(mealsStr) {
@@ -883,31 +1089,107 @@
       if (lower.indexOf('one') !== -1 || lower.indexOf('1') !== -1) num = '1';
       else if (lower.indexOf('two') !== -1 || lower.indexOf('2') !== -1) num = '2';
       else if (lower.indexOf('three') !== -1 || lower.indexOf('3') !== -1) num = '3';
-      return num + 'x/day';
+      return num + '×/day';
     }
 
-    function buildDogCard(dog) {
+    // Allergy detection: the JotForm has no dedicated allergy field, so owners
+    // write allergies into the special notes. Flag any note mentioning them.
+    function hasAllergyNote(feeding) {
+      return !!(feeding && feeding.specialNotes && /allerg/i.test(feeding.specialNotes));
+    }
+
+    // Pull the sentence mentioning the allergy out of the notes so the chip is
+    // self-contained even when the notes block is trimmed for space.
+    function allergyChipText(feeding) {
+      var parts = feeding.specialNotes.split(/[.;\n!]+/);
+      for (var i = 0; i < parts.length; i++) {
+        if (/allerg/i.test(parts[i]) && parts[i].replace(/\s+/g, ' ').trim()) {
+          return 'ALLERGY: ' + parts[i].replace(/\s+/g, ' ').trim();
+        }
+      }
+      return 'ALLERGY — see notes';
+    }
+
+    var MED_FALLBACK_TEXT = 'See medication bag / check with owner';
+
+    function buildFoodTags(foodTypes) {
+      if (!foodTypes || foodTypes.length === 0) return '';
+      var html = '';
+      for (var i = 0; i < foodTypes.length; i++) {
+        var type = foodTypes[i];
+        var info = FOOD_TYPE_MAP[type];
+        if (info) {
+          html += '<span class="food-tag ' + info.cls + '">' + info.icon + escapeHtml(info.label) + '</span>';
+        } else {
+          html += '<span class="food-tag special">' + FOOD_TYPE_MAP['Special Requirements'].icon + escapeHtml(type) + '</span>';
+        }
+      }
+      return html;
+    }
+
+    function buildQuantityRows(feeding) {
+      var html = '';
+      if (feeding.kibbleSummary) {
+        html += '<div class="qty-row"><span class="qty-label">Kibble</span><span class="qty-value">' + escapeHtml(feeding.kibbleSummary) + '</span></div>';
+      }
+      if (feeding.wetFood) {
+        html += '<div class="qty-row"><span class="qty-label">Wet</span><span class="qty-value">' + escapeHtml(feeding.wetFood) + '</span></div>';
+      }
+      if (feeding.tinFood) {
+        html += '<div class="qty-row"><span class="qty-label">Tin</span><span class="qty-value">' + escapeHtml(feeding.tinFood) + '</span></div>';
+      }
+      return html;
+    }
+
+    function buildNotesBlock(notes) {
+      if (!notes) return '';
+      return '<div class="notes-block"><div class="notes-label">Notes</div><div class="notes-text">' + escapeHtml(notes) + '</div></div>';
+    }
+
+    function buildMedChip(feeding) {
+      if (!feeding || feeding.medication !== 'Yes') return '';
+      var details = feeding.medicationDetails || MED_FALLBACK_TEXT;
+      return '<div class="med-chip">' + medIconSVG +
+               '<div class="med-text"><span class="med-label">Medication:</span> ' + escapeHtml(details) + '</div>' +
+             '</div>';
+    }
+
+    function buildAllergyChip(feeding) {
+      if (!hasAllergyNote(feeding)) return '';
+      return '<div class="allergy-chip">' + allergyIconSVG +
+               '<span class="allergy-text">' + escapeHtml(allergyChipText(feeding)) + '</span>' +
+             '</div>';
+    }
+
+    function buildNoMatchBanner() {
+      return '<div class="no-match-banner">' + warningIconSVG +
+             '<span class="no-match-text">No feeding record — check JotForm</span></div>';
+    }
+
+    function buildTodayCard(dog) {
       var feeding = dog.feeding;
       var stayType = dog.type || 'boarding';
-      var headerClass = 'card-header' + (stayType === 'school' ? ' school' : '');
+      var pillClass = 'type-pill' + (stayType === 'school' ? ' school' : '');
+      var hasMed = !!(feeding && feeding.medication === 'Yes');
 
-      var html = '<div class="dog-card">';
-      html += '<div class="' + headerClass + '">' +
-                '<div class="dog-identity">' +
-                  '<div class="paw-icon">' + pawIconSVG() + '</div>' +
-                  '<div><div class="dog-name">' + escapeHtml(dog.dogName) +
-                    ' <span class="card-type-badge">' + getTypeBadgeLabel(stayType) + '</span>' +
-                  '</div></div>' +
-                '</div>' +
-                '<div class="meals-badge">' + (feeding ? formatMealsBadge(feeding.mealsPerDay) : '—') + '</div>' +
+      var html = '<div class="tcard' + (hasMed ? ' has-med' : '') + '">';
+      html += '<div class="tcard-head">' +
+                '<div class="tcard-name">' + escapeHtml(dog.dogName) + '</div>' +
+                '<span class="' + pillClass + '">' + getTypeBadgeLabel(stayType) + '</span>' +
+                '<span class="day-badge today-badge">TODAY</span>' +
               '</div>';
 
-      html += '<div class="card-body">';
+      html += '<div class="tcard-body">';
       if (dog.matched && feeding) {
-        html += buildFoodTags(feeding.foodTypes);
+        // Safety-critical chips first so they are never clipped.
+        html += buildMedChip(feeding);
+        html += buildAllergyChip(feeding);
         html += buildQuantityRows(feeding);
+        html += '<div class="meta-row">' +
+                  '<span class="meals-pill">' + formatMealsBadge(feeding.mealsPerDay) + '</span>' +
+                  buildFoodTags(feeding.foodTypes) +
+                '</div>';
         html += buildNotesBlock(feeding.specialNotes);
-        html += buildMedAlert(feeding);
       } else {
         html += buildNoMatchBanner();
       }
@@ -915,25 +1197,220 @@
       return html;
     }
 
+    function buildTomorrowCard(dog) {
+      var feeding = dog.feeding;
+      var stayType = dog.type || 'boarding';
+      var pillClass = 'type-pill' + (stayType === 'school' ? ' school' : '');
+
+      var html = '<div class="scard">';
+      html += '<div class="scard-head">' +
+                '<div class="scard-name">' + escapeHtml(dog.dogName) + '</div>' +
+                '<span class="' + pillClass + '">' + getTypeBadgeLabel(stayType) + '</span>' +
+                '<span class="day-badge tomorrow-badge">TOMORROW</span>' +
+              '</div>';
+
+      if (dog.matched && feeding) {
+        var foodBits = [];
+        if (feeding.kibbleSummary) foodBits.push('Kibble: ' + feeding.kibbleSummary);
+        if (feeding.wetFood) foodBits.push('Wet: ' + feeding.wetFood);
+        if (feeding.tinFood) foodBits.push('Tin: ' + feeding.tinFood);
+        if (foodBits.length === 0 && feeding.foodTypes && feeding.foodTypes.length > 0) {
+          foodBits.push(feeding.foodTypes.join(', '));
+        }
+        html += '<div class="scard-line">' +
+                  '<span class="scard-meals">' + formatMealsBadge(feeding.mealsPerDay) + '</span>' +
+                  (foodBits.length ? ' &middot; ' + escapeHtml(foodBits.join(' · ')) : '') +
+                '</div>';
+        if (feeding.medication === 'Yes') {
+          var details = feeding.medicationDetails || MED_FALLBACK_TEXT;
+          html += '<div class="med-chip">' + medIconSVG +
+                    '<div class="med-text"><span class="med-label">Meds:</span> ' + escapeHtml(details) + '</div>' +
+                  '</div>';
+        } else if (hasAllergyNote(feeding)) {
+          html += '<div class="allergy-chip" style="margin-top:auto;">' + allergyIconSVG +
+                    '<span class="allergy-text" style="font-size:20px;">' + escapeHtml(allergyChipText(feeding)) + '</span>' +
+                  '</div>';
+        }
+      } else {
+        html += buildNoMatchBanner();
+      }
+      html += '</div>';
+      return html;
+    }
 
     // ============================================================
     // RENDER
     // ============================================================
+    function el(id) { return document.getElementById(id); }
 
-    function renderData(data) {
-      var loadingEl = document.getElementById('loadingState');
-      var gridEl = document.getElementById('cardsGrid');
-      var emptyEl = document.getElementById('emptyState');
-      var errorEl = document.getElementById('errorBanner');
-      var feedingWarnEl = document.getElementById('feedingWarning');
-      var dateRangeEl = document.getElementById('dateRangeText');
-      var lastUpdatedEl = document.getElementById('lastUpdated');
-      var dogCountEl = document.getElementById('dogCountText');
+    function todayLayoutClass(count) {
+      if (count <= 1) return 'g1';
+      if (count === 2) return 'g2';
+      if (count === 3) return 'g3';
+      if (count === 4) return 'g4';
+      if (count <= 6) return 'g6';
+      return 'g8';
+    }
 
-      loadingEl.style.display = 'none';
+    function tomorrowLayoutClass(count) {
+      if (count <= 1) return 's1';
+      if (count === 2) return 's2';
+      if (count === 3) return 's3';
+      if (count === 4) return 's4';
+      return 's5';
+    }
 
+    function setMainView(view) {
+      el('loadingState').style.display = view === 'loading' ? 'flex' : 'none';
+      el('emptyState').style.display = view === 'empty' ? 'flex' : 'none';
+      el('offlineState').style.display = view === 'offline' ? 'flex' : 'none';
+      el('todayZone').style.display = view === 'board' ? 'flex' : 'none';
+      el('tomorrowZone').style.display = view === 'board' ? 'block' : 'none';
+    }
+
+    function renderTodayPage() {
+      var grid = el('todayGrid');
+      var emptyMsg = el('todayEmpty');
+      var indicator = el('todayPageIndicator');
+      var dogs = state.todayDogs;
+
+      if (dogs.length === 0) {
+        grid.style.display = 'none';
+        emptyMsg.style.display = 'flex';
+        indicator.textContent = '';
+        return;
+      }
+      emptyMsg.style.display = 'none';
+      grid.style.display = 'grid';
+
+      // Single page: size the grid to the dog count for the most generous cards.
+      // Multiple pages: every page uses the full 4x2 layout so cards never jump size.
+      var layoutClass = state.todayPages > 1 ? 'g8' : todayLayoutClass(dogs.length);
+      grid.className = 'today-grid ' + layoutClass;
+
+      var start = state.todayPage * TODAY_PER_PAGE;
+      var slice = dogs.slice(start, start + TODAY_PER_PAGE);
+      var html = '';
+      for (var i = 0; i < slice.length; i++) html += buildTodayCard(slice[i]);
+      grid.innerHTML = html;
+      trimOverflowingCards(grid);
+
+      indicator.textContent = state.todayPages > 1
+        ? 'PAGE ' + (state.todayPage + 1) + ' OF ' + state.todayPages
+        : '';
+    }
+
+    /**
+     * Busy cards (medication + allergy + several quantity rows + notes) can
+     * exceed the fixed card height. Rather than clipping text mid-line, shed
+     * the lowest-priority content until the card fits, in order: clamp the
+     * notes to one line; drop the notes; drop the meals/food-tags row; drop
+     * extra quantity rows from the bottom up (the first always stays); and
+     * finally clamp the medication details to one line. The medication chip,
+     * allergy chip and primary quantity row are never removed.
+     */
+    function trimOverflowingCards(grid) {
+      var bodies = grid.querySelectorAll('.tcard-body');
+      for (var i = 0; i < bodies.length; i++) {
+        var body = bodies[i];
+        var fits = function() { return body.scrollHeight <= body.clientHeight + 1; };
+        if (fits()) continue;
+
+        var notesText = body.querySelector('.notes-text');
+        if (notesText) {
+          notesText.style.webkitLineClamp = '1';
+          if (fits()) continue;
+        }
+
+        var victims = ['.notes-block', '.meta-row'];
+        var done = false;
+        for (var j = 0; j < victims.length; j++) {
+          var victim = body.querySelector(victims[j]);
+          if (victim) {
+            victim.style.display = 'none';
+            if (fits()) { done = true; break; }
+          }
+        }
+        if (done) continue;
+
+        var qtyRows = body.querySelectorAll('.qty-row');
+        for (var k = qtyRows.length - 1; k >= 1; k--) {
+          qtyRows[k].style.display = 'none';
+          if (fits()) { done = true; break; }
+        }
+        if (done) continue;
+
+        var medText = body.querySelector('.med-chip .med-text');
+        if (medText) {
+          medText.style.webkitLineClamp = '1';
+          if (fits()) continue;
+        }
+
+        // Last resort: compress the body's own spacing.
+        body.style.gap = '4px';
+        body.style.paddingBottom = '4px';
+      }
+    }
+
+    function renderTomorrowPage() {
+      var grid = el('tomorrowGrid');
+      var emptyMsg = el('tomorrowEmpty');
+      var indicator = el('tomorrowPageIndicator');
+      var dogs = state.tomorrowDogs;
+
+      if (dogs.length === 0) {
+        grid.style.display = 'none';
+        emptyMsg.style.display = 'flex';
+        indicator.textContent = '';
+        return;
+      }
+      emptyMsg.style.display = 'none';
+      grid.style.display = 'grid';
+
+      var start = state.tomorrowPage * TOMORROW_PER_PAGE;
+      var slice = dogs.slice(start, start + TOMORROW_PER_PAGE);
+      var layoutClass = state.tomorrowPages > 1 ? 's5' : tomorrowLayoutClass(dogs.length);
+      grid.className = 'tomorrow-grid ' + layoutClass;
+
+      var html = '';
+      for (var i = 0; i < slice.length; i++) html += buildTomorrowCard(slice[i]);
+      grid.innerHTML = html;
+
+      indicator.textContent = state.tomorrowPages > 1
+        ? 'PAGE ' + (state.tomorrowPage + 1) + ' OF ' + state.tomorrowPages
+        : '';
+    }
+
+    /**
+     * Full board render from state.lastGoodData. Re-classifies today/tomorrow
+     * from the device's current date (so midnight rollover only needs a render).
+     */
+    function renderBoard() {
+      var data = state.lastGoodData;
+      var errorEl = el('errorBanner');
+      var feedingWarnEl = el('feedingWarning');
+
+      state.dayStamp = dateStamp(nowDate());
+
+      if (!data) {
+        // Nothing to show at all — keep a styled message up, never a blank screen.
+        if (state.fetchFailed) {
+          setMainView('offline');
+        } else {
+          setMainView('loading');
+        }
+        updateStatusDisplay();
+        return;
+      }
+
+      // Backend error string (e.g. "Showing last known data — upstream error: …")
+      // or a client-side fetch failure both mean the data may be out of date.
       if (data.error) {
         errorEl.textContent = data.error;
+        errorEl.style.display = 'block';
+      } else if (state.fetchFailed) {
+        errorEl.textContent = state.lastFetchError ||
+          'Connection problem — showing the last data received. The board will retry automatically.';
         errorEl.style.display = 'block';
       } else {
         errorEl.style.display = 'none';
@@ -946,50 +1423,104 @@
         feedingWarnEl.style.display = 'none';
       }
 
-      // Show "Today + Tomorrow" in the date badge instead of full range
-      dateRangeEl.textContent = formatTodayTomorrow();
+      var zones = classifyDogs(data.dogs || []);
+      state.todayDogs = zones.today;
+      state.tomorrowDogs = zones.tomorrow;
+      state.todayPages = Math.max(1, Math.ceil(zones.today.length / TODAY_PER_PAGE));
+      state.tomorrowPages = Math.max(1, Math.ceil(zones.tomorrow.length / TOMORROW_PER_PAGE));
+      if (state.todayPage >= state.todayPages) state.todayPage = 0;
+      if (state.tomorrowPage >= state.tomorrowPages) state.tomorrowPage = 0;
 
-      if (data.lastUpdated) {
-        lastUpdatedEl.textContent = formatLastUpdated(data.lastUpdated);
+      el('todayCount').textContent = String(zones.today.length);
+      el('tomorrowCount').textContent = String(zones.tomorrow.length);
+
+      if (zones.today.length === 0 && zones.tomorrow.length === 0) {
+        // With an error in play, "no dogs" would be a misleading factual claim —
+        // show the problem state instead of the cheerful empty board.
+        if (data.error || state.fetchFailed) {
+          el('offlineSub').textContent = data.error || state.lastFetchError ||
+                                         'Connection problem — retrying automatically.';
+          setMainView('offline');
+        } else {
+          setMainView('empty');
+        }
+      } else {
+        setMainView('board');
+        renderTodayPage();
+        renderTomorrowPage();
       }
 
-      // Filter to today's stays + tomorrow's arrivals, then deduplicate
-      var filtered = data.dogs ? filterTodayTomorrow(data.dogs) : [];
-      var dogs = deduplicateDogs(filtered);
-      var count = dogs.length;
-      dogCountEl.textContent = count + ' Dog' + (count !== 1 ? 's' : '') + ' Boarding';
+      updateStatusDisplay();
+    }
 
-      if (count > 0) {
-        calculateLayout(count);
-        gridEl.style.display = 'grid';
-        emptyEl.style.display = 'none';
+    function updateStatusDisplay() {
+      var pill = el('statusPill');
+      var statusText = el('statusText');
+      var data = state.lastGoodData;
 
-        var html = '';
-        for (var i = 0; i < count; i++) {
-          html += buildDogCard(dogs[i]);
-        }
-        gridEl.innerHTML = html;
+      var stale = state.fetchFailed || !state.haveLiveFetch || !!(data && data.error);
+      if (stale && data) {
+        pill.className = 'status-pill stale';
+        statusText.textContent = 'DATA MAY BE OUT OF DATE';
+      } else if (stale) {
+        pill.className = 'status-pill stale';
+        statusText.textContent = 'WAITING FOR DATA';
       } else {
-        gridEl.style.display = 'none';
-        // Only show the cheerful "no stays" message when there is no error.
-        // When an error is present, the empty state is misleading — the data
-        // failed to load, not that there are no dogs.
-        emptyEl.style.display = data.error ? 'none' : 'flex';
+        pill.className = 'status-pill';
+        statusText.textContent = 'LIVE';
+      }
+
+      el('lastUpdated').textContent = data && data.lastUpdated ? formatLastUpdated(data.lastUpdated) : '—';
+    }
+
+    // ============================================================
+    // PAGE CYCLING — gentle fade, no stacked timers
+    // ============================================================
+    function advancePages() {
+      if (state.todayPages > 1) {
+        fadeSwap('todayGrid', 'todayFadeTimer', function() {
+          state.todayPage = (state.todayPage + 1) % state.todayPages;
+          renderTodayPage();
+        });
+      }
+      if (state.tomorrowPages > 1) {
+        fadeSwap('tomorrowGrid', 'tomorrowFadeTimer', function() {
+          state.tomorrowPage = (state.tomorrowPage + 1) % state.tomorrowPages;
+          renderTomorrowPage();
+        });
       }
     }
 
+    function fadeSwap(gridId, timerKey, swapFn) {
+      var grid = el(gridId);
+      grid.style.opacity = '0';
+      // Guarded: any pending swap is cleared before a new one is queued,
+      // so timers can never stack.
+      if (state[timerKey]) clearTimeout(state[timerKey]);
+      state[timerKey] = setTimeout(function() {
+        state[timerKey] = null;
+        swapFn();
+        grid.style.opacity = '1';
+      }, FADE_MS);
+    }
 
     // ============================================================
     // DATA LOADING & REFRESH
     // ============================================================
+    function scheduleRetry() {
+      var retryAt = nowDate().getTime() + RETRY_MINUTES * 60 * 1000;
+      state.nextRefreshTime = Math.min(retryAt, computeNextRefreshTime());
+    }
 
     function loadData() {
-      var gridEl = document.getElementById('cardsGrid');
-      if (!gridEl.innerHTML) {
-        document.getElementById('loadingState').style.display = 'flex';
-      }
+      if (state.fetching) return;
+      state.fetching = true;
+      state.fetchStartedAt = nowDate().getTime();
+      state.fetchSeq++;
+      var seq = state.fetchSeq;
 
-      var fetchUrl = API_URL + (API_URL.indexOf('?') === -1 ? '?' : '&') + 'mode=feeding&token=' + encodeURIComponent(API_TOKEN);
+      var fetchUrl = API_URL + (API_URL.indexOf('?') === -1 ? '?' : '&') +
+                     'mode=feeding&token=' + encodeURIComponent(API_TOKEN);
 
       fetch(fetchUrl)
         .then(function(response) {
@@ -997,61 +1528,149 @@
           return response.json();
         })
         .then(function(data) {
-          renderData(data);
-          scheduleNextRefresh();
+          // Abandoned by the watchdog — a newer fetch owns the state now.
+          if (seq !== state.fetchSeq) return;
+          state.fetching = false;
+
+          // The backend can answer 200 OK with an error and no usable dogs
+          // (bad token, first-run failure with no stale copy). Never let such
+          // a payload replace genuine data or poison the localStorage cache.
+          var dogsOk = data && Object.prototype.toString.call(data.dogs) === '[object Array]';
+          var usable = dogsOk && (data.dogs.length > 0 || !data.error);
+
+          if (!usable && state.lastGoodData && state.lastGoodData.dogs &&
+              state.lastGoodData.dogs.length > 0) {
+            state.fetchFailed = true;
+            state.lastFetchError = ((data && data.error) ? data.error : 'Received an empty update') +
+                                   ' — keeping the last good data.';
+            scheduleRetry();
+            renderBoard();
+            return;
+          }
+
+          state.fetchFailed = false;
+          state.haveLiveFetch = true;
+          state.lastGoodData = data;
+          if (usable) {
+            try {
+              window.localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            } catch (e) { /* storage unavailable on some TV browsers — fine */ }
+          }
+          state.nextRefreshTime = computeNextRefreshTime();
+          renderBoard();
         })
         .catch(function(err) {
-          renderData({
-            dogs: [],
-            dogCount: 0,
-            dateRange: { start: '', end: '' },
-            lastUpdated: new Date().toISOString(),
-            error: 'Connection error: ' + (err.message || err),
-            feedingError: null
-          });
-          scheduleNextRefresh();
+          if (seq !== state.fetchSeq) return;
+          state.fetching = false;
+          state.fetchFailed = true;
+          // Keep showing the last good data (never blank the board) and
+          // retry sooner than the next scheduled slot.
+          state.lastFetchError = 'Connection problem — showing the last data received. ' +
+                                 'The board will retry automatically.';
+          scheduleRetry();
+          el('offlineSub').textContent = 'Connection error: ' + (err && err.message ? err.message : err) +
+                                         ' — retrying automatically.';
+          renderBoard();
         });
     }
 
     function computeNextRefreshTime() {
-      var now = new Date();
+      var now = nowDate();
       for (var i = 0; i < SCHEDULED_REFRESH_HOURS.length; i++) {
-        var candidate = new Date(now);
+        var candidate = new Date(now.getTime());
         candidate.setHours(SCHEDULED_REFRESH_HOURS[i], 0, 0, 0);
         if (candidate.getTime() > now.getTime()) return candidate.getTime();
       }
       // All of today's slots have passed — schedule for tomorrow's first slot
-      var tomorrow = new Date(now);
+      var tomorrow = new Date(now.getTime());
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(SCHEDULED_REFRESH_HOURS[0], 0, 0, 0);
       return tomorrow.getTime();
     }
 
-    function scheduleNextRefresh() {
-      nextRefreshTime = computeNextRefreshTime();
-      if (countdownTimer) clearInterval(countdownTimer);
-
-      countdownTimer = setInterval(function() {
-        var remaining = nextRefreshTime - Date.now();
-        if (remaining <= 0) {
-          clearInterval(countdownTimer);
-          loadData();
-          return;
-        }
-        var hours = Math.floor(remaining / (1000 * 60 * 60));
-        var mins = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        var secs = Math.floor((remaining % (1000 * 60)) / 1000);
-
-        document.getElementById('countdown').textContent =
-          (hours > 0 ? hours + 'h ' : '') +
-          ('0' + mins).slice(-2) + 'm ' +
-          ('0' + secs).slice(-2) + 's';
-      }, 1000);
+    function formatCountdown(ms) {
+      if (ms <= 0) return 'now';
+      var totalSecs = Math.floor(ms / 1000);
+      var hours = Math.floor(totalSecs / 3600);
+      var mins = Math.floor((totalSecs % 3600) / 60);
+      var secs = totalSecs % 60;
+      if (hours > 0) return hours + 'h ' + ('0' + mins).slice(-2) + 'm';
+      if (mins >= 5) return mins + 'm';
+      return mins + 'm ' + ('0' + secs).slice(-2) + 's';
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    // ============================================================
+    // MASTER TICK — the only interval on the page, created once.
+    // Drives the clock, countdown, page cycling, midnight rollover
+    // and scheduled refreshes.
+    // ============================================================
+    function masterTick() {
+      var now = nowDate();
+
+      // Live clock + date
+      el('clock').textContent = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+      el('clockDate').textContent = DAY_NAMES[now.getDay()] + ' ' + now.getDate() + ' ' +
+                                    MONTH_NAMES[now.getMonth()] + ' ' + now.getFullYear();
+
+      // Countdown to next refresh / retry
+      if (state.nextRefreshTime) {
+        el('countdown').textContent = formatCountdown(state.nextRefreshTime - now.getTime());
+      }
+
+      // Midnight rollover: re-classify today/tomorrow without a reload
+      if (state.dayStamp && dateStamp(now) !== state.dayStamp && state.lastGoodData) {
+        renderBoard();
+      }
+
+      // Watchdog: abandon a fetch that never settles so a single stalled
+      // request can never permanently block all future refreshes.
+      if (state.fetching && now.getTime() - state.fetchStartedAt > FETCH_TIMEOUT_MS) {
+        state.fetching = false;
+        state.fetchFailed = true;
+        state.fetchSeq++; // late responses from the hung request are discarded
+        state.lastFetchError = 'Request timed out — showing the last data received. ' +
+                               'The board will retry automatically.';
+        scheduleRetry();
+        el('offlineSub').textContent = 'Request timed out — retrying automatically.';
+        renderBoard();
+      }
+
+      // Scheduled refresh / failure retry
+      if (state.nextRefreshTime && now.getTime() >= state.nextRefreshTime && !state.fetching) {
+        // Push the marker forward immediately so a slow fetch can't double-fire.
+        state.nextRefreshTime = computeNextRefreshTime();
+        loadData();
+      }
+
+      // Page cycling on a steady rhythm
+      state.cycleSeconds++;
+      if (state.cycleSeconds >= PAGE_SECONDS) {
+        state.cycleSeconds = 0;
+        advancePages();
+      }
+    }
+
+    // ============================================================
+    // BOOT
+    // ============================================================
+    function boot() {
+      // Restore the last good payload so the board is never blank on
+      // startup, even if the first fetch fails (e.g. overnight outage).
+      try {
+        var cached = window.localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          state.lastGoodData = JSON.parse(cached);
+          renderBoard();
+        }
+      } catch (e) { /* corrupt cache or no storage — start from loading state */ }
+
+      state.nextRefreshTime = computeNextRefreshTime();
       loadData();
-    });
+      setInterval(masterTick, 1000);
+      masterTick();
+    }
+
+    document.addEventListener('DOMContentLoaded', boot);
   </script>
 </body>
 </html>
