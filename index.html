@@ -47,8 +47,16 @@
       /* School (boarding school) marker */
       --school: #8B5CF6;
 
-      /* Dynamic — set by JS via layout classes */
-      --tz: 1; /* Today-zone font scale (never below 1) */
+      /* Dynamic — set by JS. --tz is measured & grown per page by fitTodayZone()
+         to fill the screen; --med-clamp / --notes-clamp are generous line
+         ceilings that trimOverflowingCards() only tightens on dense pages. */
+      --tz: 1; /* Today-zone font scale (fit grows it up from this floor) */
+      /* High line ceilings so the clamp itself never truncates real data — the
+         per-card auto-fit shrinks the font until the FULL med/notes fit, and
+         trimOverflowingCards() only reduces these as a last resort on dense pages. */
+      --med-clamp: 12;
+      --notes-clamp: 12;
+      --qty-clamp: 8;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -322,31 +330,39 @@
     .today-grid {
       flex: 1;
       display: grid;
-      gap: 16px;
+      gap: calc(16px * var(--tz)); /* breathes with the cards as --tz grows */
       min-height: 0;
       opacity: 1;
       transition: opacity 0.35s ease;
     }
 
-    /* Layout classes — fewer dogs = bigger, more luxurious cards.
-       --tz scales card typography and never drops below 1 (the minimums).
-       --notes-clamp keeps long notes from being chopped mid-line. */
-    .today-grid.g1 { grid-template-columns: minmax(0, 1100px); grid-template-rows: minmax(0, 1fr); justify-content: center; --tz: 1.6; --notes-clamp: 6; }
-    .today-grid.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); --tz: 1.5; --notes-clamp: 6; }
-    .today-grid.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); --tz: 1.25; --notes-clamp: 5; }
-    .today-grid.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); --tz: 1.2; --notes-clamp: 3; }
-    .today-grid.g6 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); --tz: 1.08; --notes-clamp: 2; }
-    .today-grid.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); --tz: 1; --notes-clamp: 1; }
+    /* Layout classes set ONLY the grid geometry (columns x rows). The font
+       scale (--tz) is no longer pinned per-count: fitTodayZone() measures the
+       rendered cards and GROWS --tz (from a floor of 1) until they fill the
+       available height, so a near-empty board reads BIG and complete instead
+       of small and clipped. Column choice (JS todayLayoutClass): 1=g1, 2=g2,
+       3=g3, 4=g4, 5-6=g6, 7-8=g8 (4x2 — taller cards let long meds grow),
+       9=g9 (3x3), 10+=g8 paged. */
+    .today-grid.g1 { grid-template-columns: minmax(0, 1100px); grid-template-rows: minmax(0, 1fr); justify-content: center; }
+    .today-grid.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+    .today-grid.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+    .today-grid.g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    .today-grid.g6 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    .today-grid.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    .today-grid.g9 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
 
-    /* At the densest layout the food-type tags duplicate the quantity rows —
-       hide them so the meals chip and notes keep their space. The type pill
-       shrinks and any notes on a medication card give way to the med chip,
-       so nothing is ever chopped mid-line. */
+    /* Density relief for the 4-column layout (g8 = 7-8 dogs single page, or any
+       paged page of 8). Food-type tags duplicate the quantity rows, so they and
+       a med card's lower-priority notes give way first; the type pill and head
+       padding tighten. The auto-fit + trimOverflowingCards() still guarantee
+       nothing is chopped mid-line. */
     .today-grid.g8 .meta-row .food-tag { display: none; }
     .today-grid.g8 .type-pill { font-size: 14px; padding: 2px 7px; }
     .today-grid.g8 .tcard-head { padding: 10px 16px 6px; }
     .today-grid.g8 .tcard-body { gap: 6px; padding: 0 16px 12px; }
-    .today-grid.g8 .tcard.has-med .notes-block { display: none; }
+    /* Note: med-card notes are NOT pre-hidden here — the per-card auto-fit shows
+       them when there's room and trimOverflowingCards() sheds them only when a
+       card genuinely cannot fit, so a 7-8 dog page keeps med-card notes. */
 
     /* ============================================================
        TODAY CARD
@@ -377,7 +393,9 @@
       font-size: calc(48px * var(--tz));
       font-weight: 900;
       color: var(--text);
-      line-height: 1.1;
+      /* 1.3 (not 1.1) so the tall Nunito-900 glyphs are never clipped top/bottom
+         and wrapped name lines don't overlap. */
+      line-height: 1.3;
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
@@ -387,25 +405,27 @@
 
     /* Dog first name + owner surname — surnames disambiguate same-named dogs,
        so both must stay visible. They share one line when they fit; in narrow
-       cards the surname wraps to its own full-width line instead of either
-       part being crushed. Each part ellipsizes only if it alone exceeds the
-       card. Surname is em-sized so it scales with .tcard-name and .scard-name. */
+       cards the surname wraps to its own full-width line. Each part stays on one
+       line (no mid-word break); if a part would overflow, cardFits() sees the
+       clip (scrollWidth > clientWidth) and the auto-fit backs --tz off until the
+       whole name fits — so the displayed name is never broken or truncated
+       except for a single token longer than the card at the minimum scale, where
+       overflow:hidden clips it cleanly rather than letting it spill over a
+       neighbour. Surname is em-sized so it scales with the name font. */
     .name-first {
       flex: 0 1 auto;
       min-width: 0;
       max-width: 100%;
-      white-space: nowrap;
+      white-space: normal;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .name-surname {
       flex: 0 1 auto;
       min-width: 0;
       max-width: 100%;
-      white-space: nowrap;
+      white-space: normal;
       overflow: hidden;
-      text-overflow: ellipsis;
       font-size: 0.62em;
       font-weight: 700;
       color: var(--text-dim);
@@ -453,19 +473,14 @@
       flex-shrink: 0;
     }
 
+    /* Day badge — only tomorrow cards use it now (today cards dropped the
+       redundant "TODAY" badge; the zone header marks them). */
     .day-badge {
       font-weight: 900;
       letter-spacing: 1.5px;
       border-radius: 10px;
       white-space: nowrap;
       flex-shrink: 0;
-    }
-
-    .day-badge.today-badge {
-      font-size: calc(24px * var(--tz));
-      padding: calc(6px * var(--tz)) calc(14px * var(--tz));
-      background: var(--ft-cyan);
-      color: #062C3E;
     }
 
     .day-badge.tomorrow-badge {
@@ -506,11 +521,12 @@
       font-size: calc(28px * var(--tz));
       font-weight: 800;
       color: #fff;
-      line-height: 1.25;
+      line-height: 1.25; /* clears Nunito's ~1.23em glyphs under overflow:hidden */
       display: -webkit-box;
-      -webkit-line-clamp: 2;
+      -webkit-line-clamp: var(--med-clamp, 12);
       -webkit-box-orient: vertical;
       overflow: hidden;
+      overflow-wrap: anywhere;
       min-width: 0;
     }
 
@@ -546,7 +562,7 @@
     /* Quantity rows — the core feeding details */
     .qty-row {
       display: flex;
-      align-items: baseline;
+      align-items: flex-start; /* label stays top-aligned when the value wraps */
       gap: 12px;
       padding: calc(6px * var(--tz)) calc(12px * var(--tz));
       background: rgba(255, 255, 255, 0.055);
@@ -571,10 +587,19 @@
       font-size: calc(30px * var(--tz));
       font-weight: 800;
       color: var(--text);
-      line-height: 1.2;
-      white-space: nowrap;
+      line-height: 1.25; /* clears Nunito's ~1.23em glyphs under overflow:hidden without over-tall rows */
+      /* Wrap food quantities instead of ellipsizing them — staff must read the
+         full amount. The high line-clamp ceiling never truncates real (short)
+         food values; it only bounds a pathological free-text amount and gives
+         trimOverflowingCards() a lever to clamp food BEFORE medication on a card
+         that still cannot fit. The first qty-row is never dropped. */
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: var(--qty-clamp, 8);
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
       min-width: 0;
     }
 
@@ -610,6 +635,11 @@
       border-radius: 8px;
       overflow: hidden;
       min-height: 0;
+      /* Do NOT flex-shrink: shrinking would let the block clip its own notes
+         while the body still "fits", hiding truncation from the auto-fit. Keeping
+         it rigid forces unfit notes to overflow the body, so fitCard() shrinks the
+         font until they show in full (or trim sheds them as a last resort). */
+      flex-shrink: 0;
     }
 
     .notes-label {
@@ -625,11 +655,12 @@
       font-size: calc(28px * var(--tz));
       font-weight: 600;
       color: #F4E3B2;
-      line-height: 1.25;
+      line-height: 1.25; /* clears Nunito's ~1.23em glyphs under overflow:hidden */
       display: -webkit-box;
-      -webkit-line-clamp: var(--notes-clamp, 2);
+      -webkit-line-clamp: var(--notes-clamp, 12);
       -webkit-box-orient: vertical;
       overflow: hidden;
+      overflow-wrap: anywhere;
     }
 
     /* Unmatched dog — no feeding record found */
@@ -707,7 +738,7 @@
       font-size: 32px;
       font-weight: 900;
       color: var(--text);
-      line-height: 1.1;
+      line-height: 1.3; /* room for tall Nunito-900 glyphs (see .tcard-name) */
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
@@ -924,9 +955,24 @@
     var PAGE_SECONDS = 12;
     var FADE_MS = 360;
 
-    // Per-page capacities. Today: 4 cols x 2 rows keeps the 48px-name minimum.
+    // Per-page capacities. Up to SINGLE_PAGE_MAX dogs share ONE page (sized by
+    // todayLayoutClass so cards are as large as possible); beyond that the board
+    // pages in groups of TODAY_PER_PAGE (4 cols x 2 rows) so cards never shrink
+    // below the dense floor.
+    var SINGLE_PAGE_MAX = 9;
     var TODAY_PER_PAGE = 8;
     var TOMORROW_PER_PAGE = 5;
+
+    // Auto-fit bounds. fitTodayZone() sizes EACH card independently: it grows a
+    // card's font scale (--tz) up to TZ_MAX to fill its cell (a near-empty card
+    // reads huge) or shrinks it down to TZ_MIN so a long medication shows in
+    // FULL rather than being clamped. Only when even TZ_MIN overflows does
+    // trimOverflowingCards() shed lower-priority content. Per-card (not one
+    // global scale) is what stops a single very busy card — e.g. a 150-char med
+    // list — from pinning every other card small. FIT_ITERS bisections per card.
+    var TZ_MIN = 0.85;
+    var TZ_MAX = 2.2;
+    var FIT_ITERS = 7;
 
     var CACHE_KEY = 'ftFeedingBoardLastGood';
 
@@ -953,6 +999,7 @@
       tomorrowPage: 0,
       todayPages: 1,
       tomorrowPages: 1,
+      todayPerPage: TODAY_PER_PAGE, // dogs per today page (= count when single-page)
       cycleSeconds: 0,
       todayFadeTimer: null,
       tomorrowFadeTimer: null
@@ -1215,11 +1262,14 @@
       var pillClass = 'type-pill' + (stayType === 'school' ? ' school' : '');
       var hasMed = !!(feeding && feeding.medication === 'Yes');
 
+      // No "TODAY" badge here: the whole zone is titled "STAYING TODAY" (and the
+      // cyan left-border marks it), so a per-card badge is redundant and only
+      // steals header width from the dog/owner name. The type pill (Holiday /
+      // School) stays — that IS per-dog and drives the card colour.
       var html = '<div class="tcard' + (hasMed ? ' has-med' : '') + '">';
       html += '<div class="tcard-head">' +
                 '<div class="tcard-name">' + buildDogNameHtml(dog) + '</div>' +
                 '<span class="' + pillClass + '">' + getTypeBadgeLabel(stayType) + '</span>' +
-                '<span class="day-badge today-badge">TODAY</span>' +
               '</div>';
 
       html += '<div class="tcard-body">';
@@ -1286,13 +1336,17 @@
     // ============================================================
     function el(id) { return document.getElementById(id); }
 
+    // Column geometry for a SINGLE page of `count` dogs. 7-8 use g8 (4x2): the
+    // taller cards let a long medication grow bigger than a wider-but-shorter
+    // 3-column card would. 9 uses g9 (3x3, full). 10+ never reaches here (paged).
     function todayLayoutClass(count) {
       if (count <= 1) return 'g1';
       if (count === 2) return 'g2';
       if (count === 3) return 'g3';
       if (count === 4) return 'g4';
       if (count <= 6) return 'g6';
-      return 'g8';
+      if (count <= 8) return 'g8';
+      return 'g9';
     }
 
     function tomorrowLayoutClass(count) {
@@ -1331,16 +1385,85 @@
       var layoutClass = state.todayPages > 1 ? 'g8' : todayLayoutClass(dogs.length);
       grid.className = 'today-grid ' + layoutClass;
 
-      var start = state.todayPage * TODAY_PER_PAGE;
-      var slice = dogs.slice(start, start + TODAY_PER_PAGE);
+      var perPage = state.todayPerPage || TODAY_PER_PAGE;
+      var start = state.todayPage * perPage;
+      var slice = dogs.slice(start, start + perPage);
       var html = '';
       for (var i = 0; i < slice.length; i++) html += buildTodayCard(slice[i]);
       grid.innerHTML = html;
+      // Grow the font to fill the available space (few dogs / short text), then
+      // shed only what still cannot fit (dense pages). Order matters: fit first
+      // so trim measures the final, chosen scale.
+      fitTodayZone(grid);
       trimOverflowingCards(grid);
 
       indicator.textContent = state.todayPages > 1
         ? 'PAGE ' + (state.todayPage + 1) + ' OF ' + state.todayPages
         : '';
+    }
+
+    /**
+     * Does this single card's content fit its (fixed-height) grid cell? Measured
+     * in pre-transform layout pixels (clientHeight / scrollHeight), which
+     * fitToScreen's CSS transform does not affect — never getBoundingClientRect().
+     */
+    function cardFits(card) {
+      if (card.scrollHeight > card.clientHeight + 1) return false;
+      var body = card.querySelector('.tcard-body');
+      if (body && (body.scrollHeight > body.clientHeight + 1 ||
+                   body.scrollWidth > body.clientWidth + 1)) return false;
+      // Name parts now WRAP (overflow-wrap:anywhere) rather than ellipsize, so a
+      // too-wide name grows the head vertically — caught by the card/body height
+      // checks above. These zero-tolerance width checks are a backstop for the
+      // rare unbreakable token and for the header row overflowing (type pill
+      // crowding the name); a clipped header means "does not fit" so --tz backs off.
+      var parts = card.querySelectorAll('.name-first, .name-surname');
+      for (var p = 0; p < parts.length; p++) {
+        if (parts[p].scrollWidth > parts[p].clientWidth) return false;
+      }
+      var head = card.querySelector('.tcard-head');
+      if (head && head.scrollWidth > head.clientWidth) return false;
+      return true;
+    }
+
+    /**
+     * Auto-fit: size EACH card independently. The grid cells are a fixed height
+     * (grid 1fr rows), so a card's content either has spare room (grow the font
+     * to fill it — a near-empty card reads BIG) or it doesn't (shrink toward
+     * TZ_MIN so a long medication / notes still show in FULL). Sizing per card
+     * stops one very busy card from pinning every other card small. If even
+     * TZ_MIN overflows, the card is left at the floor for trimOverflowingCards()
+     * to shed. ~9 reflows per card; runs once per page render (never on the 1s
+     * tick), so there is no loop and no measurable cost.
+     */
+    function fitCard(card) {
+      // Floor first: if even TZ_MIN overflows, leave it there and let trim shed.
+      card.style.setProperty('--tz', TZ_MIN);
+      void card.offsetHeight;
+      if (!cardFits(card)) return;
+
+      // Ceiling: lots of room — take the max and stop.
+      card.style.setProperty('--tz', TZ_MAX);
+      void card.offsetHeight;
+      if (cardFits(card)) return;
+
+      // Otherwise bisect for the largest fitting scale. Monotonic: a larger --tz
+      // never reduces content height, so this cannot oscillate.
+      var lo = TZ_MIN, hi = TZ_MAX;
+      for (var n = 0; n < FIT_ITERS; n++) {
+        var mid = (lo + hi) / 2;
+        card.style.setProperty('--tz', mid);
+        void card.offsetHeight;
+        if (cardFits(card)) lo = mid; else hi = mid;
+      }
+      card.style.setProperty('--tz', lo);
+      void card.offsetHeight;
+    }
+
+    function fitTodayZone(grid) {
+      if (!grid || grid.clientHeight <= 0) return;
+      var cards = grid.children;
+      for (var i = 0; i < cards.length; i++) fitCard(cards[i]);
     }
 
     /**
@@ -1383,10 +1506,32 @@
         }
         if (done) continue;
 
+        // Food yields BEFORE medication. The first qty-row is never dropped, so a
+        // very long (free-text) food amount is clamped here — keeping medication
+        // text at full length. Real food values are 1-2 lines, so this is a no-op
+        // unless an owner typed a paragraph into the amount.
+        var qtyVals = body.querySelectorAll('.qty-value');
+        if (qtyVals.length) {
+          var qtyClamps = ['3', '2', '1'];
+          for (var q = 0; q < qtyClamps.length; q++) {
+            for (var qv = 0; qv < qtyVals.length; qv++) qtyVals[qv].style.webkitLineClamp = qtyClamps[q];
+            if (fits()) { done = true; break; }
+          }
+          if (done) continue;
+        }
+
+        // Medication is the most safety-critical text, so it is clamped LAST and
+        // PROGRESSIVELY — keep as many lines as still fit (4 -> 3 -> 2 -> 1)
+        // rather than dropping straight to one line. The med chip itself is never
+        // removed.
         var medText = body.querySelector('.med-chip .med-text');
         if (medText) {
-          medText.style.webkitLineClamp = '1';
-          if (fits()) continue;
+          var medClamps = ['4', '3', '2', '1'];
+          for (var m = 0; m < medClamps.length; m++) {
+            medText.style.webkitLineClamp = medClamps[m];
+            if (fits()) { done = true; break; }
+          }
+          if (done) continue;
         }
 
         // Last resort: compress the body's own spacing.
@@ -1469,7 +1614,12 @@
       var zones = classifyDogs(data.dogs || []);
       state.todayDogs = zones.today;
       state.tomorrowDogs = zones.tomorrow;
-      state.todayPages = Math.max(1, Math.ceil(zones.today.length / TODAY_PER_PAGE));
+      // Up to SINGLE_PAGE_MAX dogs fit one page (sized big by todayLayoutClass);
+      // beyond that, page in groups of TODAY_PER_PAGE so cards stay legible.
+      state.todayPerPage = zones.today.length <= SINGLE_PAGE_MAX
+        ? Math.max(1, zones.today.length)
+        : TODAY_PER_PAGE;
+      state.todayPages = Math.max(1, Math.ceil(zones.today.length / state.todayPerPage));
       state.tomorrowPages = Math.max(1, Math.ceil(zones.tomorrow.length / TOMORROW_PER_PAGE));
       if (state.todayPage >= state.todayPages) state.todayPage = 0;
       if (state.tomorrowPage >= state.tomorrowPages) state.tomorrowPage = 0;
@@ -1489,8 +1639,14 @@
         }
       } else {
         setMainView('board');
-        renderTodayPage();
+        // Reclaim the tomorrow strip's ~200px for today when nothing arrives
+        // tomorrow — today-zone is flex:1, so collapsing the empty strip lets
+        // the cards grow into that space. Do this BEFORE renderTodayPage so the
+        // auto-fit measures the final available height. Render tomorrow first
+        // for the same reason (its visibility affects today's height).
+        el('tomorrowZone').style.display = (zones.tomorrow.length === 0) ? 'none' : 'block';
         renderTomorrowPage();
+        renderTodayPage();
       }
 
       updateStatusDisplay();
@@ -1724,6 +1880,16 @@
       loadData();
       setInterval(masterTick, 1000);
       masterTick();
+
+      // The auto-fit measures text, so it must run with the real web font (Nunito
+      // 900 is wider/taller than the Segoe UI fallback). If the first render
+      // happened before the font loaded, re-render once it is ready so the fit is
+      // computed against the final glyphs. Guarded for browsers without the API.
+      if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
+        document.fonts.ready.then(function() {
+          if (state.lastGoodData) renderBoard();
+        });
+      }
     }
 
     document.addEventListener('DOMContentLoaded', boot);
