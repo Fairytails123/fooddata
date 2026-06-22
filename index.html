@@ -1198,6 +1198,9 @@
       var html = '';
       for (var i = 0; i < foodTypes.length; i++) {
         var type = foodTypes[i];
+        // Amount-less types are shown as their own feeding row (buildQuantityRows),
+        // so don't also render them as a tag — that would double them up.
+        if (type === 'Pre-Portioned by parents' || type === 'Special Requirements') continue;
         var info = FOOD_TYPE_MAP[type];
         if (info) {
           html += '<span class="food-tag ' + info.cls + '">' + info.icon + escapeHtml(info.label) + '</span>';
@@ -1218,6 +1221,19 @@
       }
       if (feeding.tinFood) {
         html += '<div class="qty-row"><span class="qty-label">Tin</span><span class="qty-value">' + escapeHtml(feeding.tinFood) + '</span></div>';
+      }
+      // Food types that carry NO measured amount: render them as their own
+      // feeding row so they stay visible (the food-type tags are hidden in the
+      // dense g8 layout, which would otherwise drop a dog like Lola Hall whose
+      // only feeding info is "Pre-portioned by parents"). Pre-portioned needs no
+      // quantity — staff give the portion the parents send.
+      var types = feeding.foodTypes || [];
+      for (var t = 0; t < types.length; t++) {
+        if (types[t] === 'Pre-Portioned by parents') {
+          html += '<div class="qty-row"><span class="qty-label">Food</span><span class="qty-value">Pre-portioned by parents</span></div>';
+        } else if (types[t] === 'Special Requirements') {
+          html += '<div class="qty-row"><span class="qty-label">Special</span><span class="qty-value">See notes</span></div>';
+        }
       }
       return html;
     }
