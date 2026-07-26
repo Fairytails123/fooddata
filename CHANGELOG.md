@@ -1,3 +1,37 @@
+# Changelog — One-Page Board + Rotating Lists Screen, 26 July 2026
+
+Deployed to GitHub Pages 2026-07-26: commits `424a336` (docs) + `40612c4` (board), verified serving live. The TV browser needs one manual refresh after any deploy (the page never reloads itself).
+
+## Rollback
+
+```
+git push origin 2a61e12:main --force
+```
+
+(`2a61e12` = the last pre-rebuild commit / the previous live board. The older `pre-tv-upgrade-20260611` tag still restores the pre-June-2026 board.)
+
+## Owner-locked decisions (interviewed 2026-07-26)
+
+- **Dog cards are NEVER paged.** Every dog staying today renders on ONE cards screen; a fuller house means smaller cards, never a second page.
+- **Nothing is ever truncated — text shrinks as far as needed** (per-card fit floor `TZ_MIN` 0.85 → 0.3). The trim ladder only exists below that floor and was never reached in testing.
+- **Alphabetical display order** (dog first name, then surname; `localeCompare` so accented names file correctly) on the cards and both lists. The backend's med-first sort is transport-only now — CLAUDE.md records that med-first display MUST return if paging ever does. Safe because every dog is always on screen.
+- **Design ceiling 20 dogs** (grid ladder g10 5×2 → g20 5×4, `dense` styling ≥10, inline cols×rows valve beyond 20).
+- **The tomorrow mini-card strip is gone** — replaced by a second rotating LISTS screen so the cards screen keeps the whole canvas. Dwell 45 s cards / 15 s lists (`CARDS_SCREEN_SECONDS` / `LISTS_SCREEN_SECONDS`, one-line retunables).
+
+## Changes
+
+- **Lists screen:** "FEED PREP — IN TONIGHT" (every today dog, alphabetical, checkbox bullets, red MEDS / amber ALLERGY / NO RECORD flags) + "ARRIVING TOMORROW" (same flags **plus full medication-details and allergy-sentence lines** — arrivals have no card anywhere, so their med text lives here and must never be reduced to a bare flag).
+- **Rotation guards:** a board with only arrivals pins the lists screen (no bare "No dogs boarding today" shell 45 s of every minute); leaving the board view cancels any mid-flight fade swap (the 360 ms callback can never resurrect the board over the offline/empty state — the callback also re-checks itself); the dwell counter resets while rotation is parked so a returning board gets its full 45 s; the cross-fade genuinely fades both ways (incoming zone's opacity hits 0 before its render/fit); rotation swaps skip rebuilding unchanged screens via `state.renderVersion` stamps (a swap is a display/opacity toggle, not ~180 forced reflows on the TV CPU).
+- **List fitting:** shared `bisectScale()` (also used by the card fit) sizes each panel's `--lz`; `listFits()` checks the container on both axes AND every name span (stops long names overlapping the next column invisibly); columns escalate to 4 before an explicit amber "LIST TOO LONG — SOME NAMES CLIPPED" banner — a safety checklist never clips silently.
+- **Removed:** today-zone paging (constants, slicing, `PAGE x OF y` indicator element + CSS), the tomorrow strip and its `scard` styles, the day badge, the per-page fade machinery.
+- Name rendering unified in `buildNamePartsHtml` (cards + lists share the escape-both / never-drop-the-surname contract); `-webkit-` column prefixes for the old Hisense WebKit.
+
+## Verification
+
+16 headless-Chrome scenarios at 1920×1080 (live replay, 18- and 20-dog single-page boards with shuffled names proving the alphabetical sort, arrivals-only pin, 50 s rotation landing on the lists screen, worst-case 10× heavy meds, empty, fetch-fail with/without cache, hung fetch, poison payload, backend stale, overlap dedup, midnight rollover, XSS) — zero JS errors, zero card overflows, zero truncation, order checks green — plus two 24/32-agent adversarial review workflows; all 15 verified findings (8 correctness, incl. the fade-timer/offline race and the missing arrivals med details) fixed and re-verified.
+
+---
+
 # Changelog — TV Display Upgrade, 11 June 2026
 
 ## Rollback
