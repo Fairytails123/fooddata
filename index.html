@@ -20,8 +20,11 @@
          TOMORROW & PREP LIST page — two big alphabetical lists: FEED
            PREP (all of today's dogs, checkbox bullets, MEDS/ALLERGY
            flags) and ARRIVING TOMORROW (with full med detail).
-       Remote input: click/cursor-OK on a pill, focus+OK (pills are real
-       buttons), or bare ArrowLeft/ArrowRight anywhere on the page.
+       Remote input: click/cursor-OK on a pill selects that page; bare
+       ArrowLeft/ArrowRight anywhere select (◄ TODAY / ► TOMORROW); and
+       OK/Enter anywhere TOGGLES the page (debounced against key-repeat
+       and dual keydown+click shells — see handleRemoteKey; its
+       preventDefault suppresses the native focused-pill re-click).
        Dogs beyond tomorrow are filtered out client-side.
 
        No-scroll TV dashboard — everything fits one 1920x1080 screen.
@@ -859,6 +862,7 @@
     }
     .list-detail.med-detail { color: #FF9DAB; }
     .list-detail.allergy-detail { color: #FFD477; }
+    .list-detail.supp-detail { color: #A7EFD2; }
 
     /* Honest-failure banner: shown only if a list cannot fit even at LZ_MIN
        with 4 columns — silent clipping is never OK on a safety checklist. */
@@ -958,6 +962,7 @@
       <div class="header-mid">
         <div class="pill-row">
           <button type="button" class="count-pill today-pill" id="todayPillBtn" aria-pressed="true"><span class="count-num" id="todayCount">—</span> TODAY</button>
+          <!-- Label also appears in renderTodayCards' pointer message — keep in sync -->
           <button type="button" class="count-pill tomorrow-pill unselected" id="tomorrowPillBtn" aria-pressed="false"><span class="count-num" id="tomorrowCount">—</span> TOMORROW &amp; PREP LIST</button>
         </div>
         <div class="pill-hint">Remote arrows or OK change the page</div>
@@ -1367,18 +1372,29 @@
     }
 
     /**
-     * Training-dog supplements subcard (green) — deliberately SEPARATE from
-     * the red medication chip, which stays prescription-only. Guarded for
-     * records parsed before the field existed (stale caches have no
-     * `supplements` key). Values come from the JotForm checklist verbatim.
+     * Escaped supplement values, or [] — shared by the card subcard AND the
+     * arrivals detail line (an arriving dog's supplements must show on the
+     * TOMORROW & PREP LIST, its only surface, or they'd be invisible until
+     * the dog already checked in). Guarded for records parsed before the
+     * field existed (stale caches have no `supplements` key).
      */
-    function buildSupplementsBlock(feeding) {
-      var supps = feeding.supplements;
-      if (!supps || supps.length === 0) return '';
+    function suppParts(feeding) {
+      var supps = feeding && feeding.supplements;
+      if (!supps || supps.length === 0) return [];
       var parts = [];
       for (var i = 0; i < supps.length; i++) {
         if (supps[i]) parts.push(escapeHtml(String(supps[i])));
       }
+      return parts;
+    }
+
+    /**
+     * Training-dog supplements subcard (green) — deliberately SEPARATE from
+     * the red medication chip, which stays prescription-only. Values come
+     * from the JotForm checklist verbatim.
+     */
+    function buildSupplementsBlock(feeding) {
+      var parts = suppParts(feeding);
       if (parts.length === 0) return '';
       return '<div class="supp-block"><div class="supp-label">Supplements</div>' +
              '<div class="supp-text">' + parts.join(' &middot; ') + '</div></div>';
@@ -1451,9 +1467,9 @@
      * One row of the lists screen: [checkbox] DogName Surname [MEDS] [ALLERGY].
      * withBox=true adds the prep-checklist tick box (today dogs — their full
      * detail lives on the cards page). withDetail=true is for the ARRIVING
-     * TOMORROW list, whose dogs have NO card on either page: it
-     * prints the medication details and allergy sentence under the name, so
-     * arrival med info is never reduced to a bare flag.
+     * TOMORROW list, whose dogs have NO card on either page: it prints the
+     * medication details, allergy sentence AND supplements under the name,
+     * so arrival med/supplement info is never reduced to a bare flag.
      */
     function buildListItem(dog, withBox, withDetail) {
       var feeding = dog.feeding;
@@ -1475,6 +1491,12 @@
       }
       if (withDetail && hasAllergyNote(feeding)) {
         html += '<div class="list-detail allergy-detail">' + escapeHtml(allergyChipText(feeding)) + '</div>';
+      }
+      if (withDetail) {
+        var sd = suppParts(feeding);
+        if (sd.length) {
+          html += '<div class="list-detail supp-detail">' + sd.join(' &middot; ') + '</div>';
+        }
       }
       html += '</div>';
       return html;
@@ -1549,6 +1571,7 @@
         // With arrivals in the system this page is normally pinned away by
         // renderBoard; if a manual press lands here anyway, say where the
         // information went instead of showing a dead end.
+        // Page name below must stay in sync with #tomorrowPillBtn's label.
         emptyMsg.textContent = state.tomorrowDogs.length > 0
           ? 'No dogs boarding today — arrivals & feed prep are on the TOMORROW & PREP LIST page'
           : 'No dogs boarding today';
@@ -1854,7 +1877,11 @@
         // the next render, where the enriched empty message points the way).
         // Otherwise an explicit remote choice is sticky; without one, TODAY.
         if (zones.today.length === 0) {
+          // The pin also CLEARS the sticky flag: the manual choice it just
+          // overrode is void, and a stale flag would otherwise keep the board
+          // parked on the lists page even after today dogs appear hours later.
           state.screen = 'lists';
+          state.userSelected = false;
         } else if (!state.userSelected) {
           state.screen = 'cards';
         }
@@ -1924,17 +1951,20 @@
      * Selects a page ('cards' | 'lists') from a remote press. Only a press
      * that actually CHANGES the page marks the choice sticky — a visibly
      * no-op press must not silently disable the default/pin logic hours
-     * later. Re-renders only while the board view is actually up — with
-     * zero dogs the empty/offline state stays; the choice still sticks.
+     * later. With NO dogs at all (empty/offline/loading view) the press is
+     * ignored entirely: there is no visible page to change, and an invisible
+     * sticky flip would make the next data render open on the wrong page.
      */
     function selectScreen(which) {
+      if (state.todayDogs.length === 0 && state.tomorrowDogs.length === 0) {
+        updatePillSelection();
+        return;
+      }
       var changed = state.screen !== which;
       if (changed) {
         state.userSelected = true;
         state.screen = which;
-        if (state.todayDogs.length > 0 || state.tomorrowDogs.length > 0) {
-          renderActiveScreen();
-        }
+        renderActiveScreen();
       }
       updatePillSelection();
     }
@@ -1951,6 +1981,16 @@
      * real click events on the pills, which this handler never sees.
      * Checks e.key AND e.keyCode: old TV WebKits only set keyCode.
      */
+    // Enter/OK toggle debounce. Two failure modes it closes: a HELD OK button
+    // auto-repeats keydown and would strobe the pages (old TV WebKits don't
+    // set e.repeat, so a time window is needed, not just the flag); and some
+    // TV shells send BOTH keydown(13) and an independent synthesized click
+    // for one OK press (ignoring keydown preventDefault) — the click lands
+    // inside the window and must not un-toggle the toggle. Arrows need no
+    // debounce (their target is idempotent).
+    var TOGGLE_DEBOUNCE_MS = 450;
+    var lastToggleAt = 0;
+
     function handleRemoteKey(e) {
       var key = e.key || '';
       var code = e.keyCode || 0;
@@ -1959,7 +1999,11 @@
       } else if (key === 'ArrowRight' || code === 39) {
         selectScreen('lists');
       } else if (key === 'Enter' || code === 13) {
-        selectScreen(state.screen === 'cards' ? 'lists' : 'cards');
+        var now = new Date().getTime();
+        if (!e.repeat && now - lastToggleAt > TOGGLE_DEBOUNCE_MS) {
+          lastToggleAt = now;
+          selectScreen(state.screen === 'cards' ? 'lists' : 'cards');
+        }
       } else {
         return;
       }
@@ -2128,12 +2172,23 @@
     function boot() {
       fitToScreen();
       window.addEventListener('resize', fitToScreen);
-      // Page-select inputs: pill clicks (cursor-mode remotes, and focus+OK —
-      // OK on a focused <button> fires its native click) plus raw arrow keys
-      // for browsers that pass key events straight through.
-      el('todayPillBtn').addEventListener('click', function() { selectScreen('cards'); });
-      el('tomorrowPillBtn').addEventListener('click', function() { selectScreen('lists'); });
+      // Page-select inputs: pill clicks (cursor-mode remotes) plus raw keys
+      // (arrows select, OK/Enter toggles) for browsers that pass key events
+      // straight through. pillClick ignores a click landing inside the
+      // Enter-toggle debounce window — on shells that send BOTH keydown(13)
+      // and a synthesized click for one OK press, that click would otherwise
+      // instantly un-toggle the toggle.
+      function pillClick(which) {
+        if (new Date().getTime() - lastToggleAt <= TOGGLE_DEBOUNCE_MS) return;
+        selectScreen(which);
+      }
+      el('todayPillBtn').addEventListener('click', function() { pillClick('cards'); });
+      el('tomorrowPillBtn').addEventListener('click', function() { pillClick('lists'); });
       document.addEventListener('keydown', handleRemoteKey);
+      // Stamp the day at boot: a remote press during the pre-data loading view
+      // must not leave a sticky choice that renderBoard's day-change reset
+      // can't see (the reset needs a prior stamp to compare against).
+      state.dayStamp = dateStamp(nowDate());
       updatePillSelection();
       // Restore the last good payload so the board is never blank on
       // startup, even if the first fetch fails (e.g. overnight outage).
