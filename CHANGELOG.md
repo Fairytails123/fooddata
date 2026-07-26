@@ -10,7 +10,7 @@ Deployed to GitHub Pages 2026-07-26: commits `424a336` (docs) + `40612c4` (board
 - **Selection rules:** an explicit press is sticky (renders never override it); defaults until then = TODAY, or TOMORROW & PREP LIST when only arrivals exist; midnight resets the manual choice (yesterday's "tomorrow" page is about today).
 - Page content, card layout, feeding info and dog counts unchanged.
 - Verified: 18 headless-Chrome scenarios green, incl. click-path selection, ArrowRight/ArrowLeft toggle, a 70-virtual-second no-rotation hold, and the arrivals-only default; zero errors/overflows/truncation throughout.
-- ⚠️ The physical remote's input mode (cursor vs spatial-nav vs raw keys) needs one on-TV confirmation — all three paths are wired, but which one the Hisense browser uses is only observable on the device.
+- ✅ Owner-confirmed working on the real TV with the physical remote, 2026-07-26 evening ("all works fine"). All three input paths remain wired — do not remove any of them; which one the Hisense browser uses was never isolated, only that the combination works.
 
 ## Rollback
 
