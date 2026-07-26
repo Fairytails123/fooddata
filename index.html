@@ -13,12 +13,15 @@
        Optimised for Hisense 40" 40E4QTUK FHD (1920x1080), wall-mounted,
        read by staff from 3-5 metres. Dark theme for distance legibility.
 
-       Layout: header band -> one of two ROTATING SCREENS:
-         CARDS screen — every dog staying today on ONE page (alphabetical,
+       Layout: header band -> one of two MANUALLY SELECTED pages (no
+       auto-rotation — the header count pills are remote buttons):
+         TODAY page — every dog staying today on ONE page (alphabetical,
            per-card auto-sized so nothing is ever truncated), full height;
-         LISTS screen — two big alphabetical lists: FEED PREP (all of
-           today's dogs, checkbox bullets, MEDS/ALLERGY flags) and
-           ARRIVING TOMORROW. Cards dominate the cycle (45s vs 15s).
+         TOMORROW & PREP LIST page — two big alphabetical lists: FEED
+           PREP (all of today's dogs, checkbox bullets, MEDS/ALLERGY
+           flags) and ARRIVING TOMORROW (with full med detail).
+       Remote input: click/cursor-OK on a pill, focus+OK (pills are real
+       buttons), or bare ArrowLeft/ArrowRight anywhere on the page.
        Dogs beyond tomorrow are filtered out client-side.
 
        No-scroll TV dashboard — everything fits one 1920x1080 screen.
@@ -141,21 +144,35 @@
 
     .header-mid {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 14px;
+      gap: 5px;
       flex-shrink: 0;
     }
 
+    .pill-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* The count pills are the page-select BUTTONS (remote-driven): the
+       selected page's pill is filled, the other is a dimmed outline. Real
+       <button> elements so cursor-mode TV browsers can click them and
+       spatial-nav browsers can focus them and send OK. */
     .count-pill {
       display: inline-flex;
       align-items: baseline;
       gap: 8px;
       padding: 10px 20px;
+      border: 0;
       border-radius: 14px;
+      font-family: inherit;
       font-size: 20px;
       font-weight: 900;
       letter-spacing: 0.5px;
       white-space: nowrap;
+      cursor: pointer;
     }
 
     .count-pill .count-num { font-size: 30px; }
@@ -168,6 +185,34 @@
     .count-pill.tomorrow-pill {
       background: var(--ft-amber);
       color: #3A2A00;
+    }
+
+    /* Unselected page: ghost/outline version of the same colour family, so
+       the filled pill unambiguously marks the page on screen. */
+    .count-pill.unselected.today-pill {
+      background: rgba(0, 180, 216, 0.10);
+      color: var(--ft-cyan);
+      box-shadow: inset 0 0 0 2px rgba(0, 180, 216, 0.55);
+    }
+
+    .count-pill.unselected.tomorrow-pill {
+      background: rgba(255, 183, 3, 0.10);
+      color: var(--ft-amber);
+      box-shadow: inset 0 0 0 2px rgba(255, 183, 3, 0.55);
+    }
+
+    /* Remote focus ring (spatial-nav browsers move focus with the arrows) */
+    .count-pill:focus {
+      outline: 3px solid var(--text);
+      outline-offset: 2px;
+    }
+
+    .pill-hint {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-faint);
+      white-space: nowrap;
     }
 
     .header-right {
@@ -322,8 +367,6 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
-      opacity: 1;
-      transition: opacity 0.35s ease; /* screen-rotation fade */
     }
 
     .today-grid {
@@ -683,18 +726,16 @@
     }
 
     /* ============================================================
-       LISTS SCREEN — feed-prep checklist + tomorrow's arrivals.
-       Gets its own rotation slot so the cards screen keeps the whole
-       canvas. Both lists are alphabetical; --lz is the per-panel font
-       scale, sized by renderNameList()/bisectScale() so every name shows.
+       LISTS SCREEN — the "TOMORROW & PREP LIST" page: feed-prep
+       checklist + tomorrow's arrivals, selected via the header pill.
+       Both lists are alphabetical; --lz is the per-panel font scale,
+       sized by renderNameList()/bisectScale() so every name shows.
        ============================================================ */
     .lists-zone {
       flex: 1;
       display: flex;
       gap: 36px;
       min-height: 0;
-      opacity: 1;
-      transition: opacity 0.35s ease; /* screen-rotation fade */
     }
 
     .list-panel {
@@ -882,8 +923,11 @@
         </div>
       </div>
       <div class="header-mid">
-        <div class="count-pill today-pill"><span class="count-num" id="todayCount">—</span> TODAY</div>
-        <div class="count-pill tomorrow-pill"><span class="count-num" id="tomorrowCount">—</span> TOMORROW</div>
+        <div class="pill-row">
+          <button type="button" class="count-pill today-pill" id="todayPillBtn" aria-pressed="true"><span class="count-num" id="todayCount">—</span> TODAY</button>
+          <button type="button" class="count-pill tomorrow-pill unselected" id="tomorrowPillBtn" aria-pressed="false"><span class="count-num" id="tomorrowCount">—</span> TOMORROW &amp; PREP LIST</button>
+        </div>
+        <div class="pill-hint">◄ ► or OK on the remote changes page</div>
       </div>
       <div class="header-right">
         <div class="clock-block">
@@ -968,14 +1012,12 @@
     // is abandoned after this long so refreshes can never be wedged permanently.
     var FETCH_TIMEOUT_MS = 90 * 1000;
 
-    // Screen rotation. The board alternates between the CARDS screen (every dog
-    // staying today, one page, full height — the safety-critical view) and the
-    // LISTS screen (alphabetical feed-prep checklist + tomorrow's arrivals).
-    // Cards dominate the cycle; the lists get a short slot. Dog cards are NEVER
-    // paged — a full house just makes each card smaller (see TZ_MIN).
-    var CARDS_SCREEN_SECONDS = 45;
-    var LISTS_SCREEN_SECONDS = 15;
-    var FADE_MS = 360;
+    // Page selection is MANUAL (owner decision 2026-07-26, revised same day):
+    // there is NO auto-rotation. The header count pills are remote buttons —
+    // TODAY shows the cards page, TOMORROW & PREP LIST shows the lists page —
+    // and the board stays on the chosen page until the other button is
+    // pressed. Dog cards are NEVER paged — a full house just makes each card
+    // smaller (see TZ_MIN).
 
     // Auto-fit bounds. fitTodayZone() sizes EACH card independently: it grows a
     // card's font scale (--tz) up to TZ_MAX to fill its cell (a near-empty card
@@ -1016,12 +1058,12 @@
       dayStamp: '',           // 'YYYY-MM-DD' — change triggers midnight re-classification
       todayDogs: [],          // alphabetical (sortDogsAlpha) — the display order
       tomorrowDogs: [],       // alphabetical
-      screen: 'cards',        // 'cards' | 'lists' — which rotation screen shows
-      screenSeconds: 0,       // seconds the current screen has been up
-      screenFadeTimer: null,
-      // Data-version stamps: rotation swaps skip the rebuild (innerHTML +
-      // ~9 forced reflows per card) when a screen was already rendered for
-      // the current data — the swap becomes a pure display/opacity toggle.
+      screen: 'cards',        // 'cards' | 'lists' — which page is selected
+      userSelected: false,    // true once a remote press chose a page — the
+                              // choice is then sticky until midnight resets it
+      // Data-version stamps: page switches skip the rebuild (innerHTML +
+      // ~9 forced reflows per card) when a page was already rendered for
+      // the current data — the switch becomes a pure display toggle.
       renderVersion: 0,
       todayRenderedVersion: -1,
       listsRenderedVersion: -1
@@ -1728,11 +1770,6 @@
       el('tomorrowCount').textContent = String(zones.tomorrow.length);
 
       if (zones.today.length === 0 && zones.tomorrow.length === 0) {
-        // Leaving the board view: a mid-flight screen swap must die with it,
-        // or its 360ms callback would force the board view back over the
-        // state chosen here.
-        cancelPendingScreenSwap();
-        state.screenSeconds = 0;
         // With an error in play, "no dogs" would be a misleading factual claim —
         // show the problem state instead of the cheerful empty board.
         if (data.error || state.fetchFailed) {
@@ -1743,23 +1780,22 @@
           setMainView('empty');
         }
       } else {
-        // Only arrivals in the system: the cards screen would be a bare
-        // "No dogs boarding today" shell, so pin the lists screen (arrivals +
-        // empty prep panel) instead of blanking the board 45s of every minute.
-        // Rotation is parked while today is empty (see masterTick), and a
-        // mid-flight swap is cancelled so its callback can't unpin us.
-        if (zones.today.length === 0) {
-          cancelPendingScreenSwap();
-          state.screen = 'lists';
+        // Default page until a remote press chooses one: TODAY normally; the
+        // lists page when only arrivals exist (a bare "No dogs boarding
+        // today" shell helps nobody). An explicit remote choice is sticky —
+        // renders never override it (midnight resets it, see masterTick).
+        if (!state.userSelected) {
+          state.screen = (zones.today.length === 0 && zones.tomorrow.length > 0) ? 'lists' : 'cards';
         }
         renderActiveScreen();
       }
 
+      updatePillSelection();
       updateStatusDisplay();
     }
 
     /**
-     * Shows whichever rotation screen is active and renders it. The fit
+     * Shows whichever page is selected and renders it. The fit
      * routines measure layout, so the zone must be visible (display set by
      * setMainView) BEFORE its render runs — a display:none zone measures 0.
      */
@@ -1790,54 +1826,64 @@
     }
 
     // ============================================================
-    // SCREEN ROTATION — cards <-> lists, gentle fade, no stacked timers
+    // PAGE SELECTION — the header pills are remote buttons; no rotation
     // ============================================================
 
     /**
-     * Cancels a mid-flight screen swap. Called whenever renderBoard leaves
-     * the board view — otherwise the pending 360ms fade callback would fire
-     * later and force setMainView('board') back over the offline/empty
-     * state. Both zones' opacity is restored because a cancelled fade leaves
-     * opacity 0 inline, which would make a future board view invisible.
+     * Reflects state.screen on the two pill buttons (filled = selected,
+     * ghost = the other page) and keeps focus on the selected pill so a
+     * spatial-nav remote's OK always has a sane target. Focus is safe to
+     * steal — the pills are the only focusable things on the page.
      */
-    function cancelPendingScreenSwap() {
-      if (state.screenFadeTimer) {
-        clearTimeout(state.screenFadeTimer);
-        state.screenFadeTimer = null;
+    function updatePillSelection() {
+      var todayBtn = el('todayPillBtn');
+      var tomBtn = el('tomorrowPillBtn');
+      var cards = state.screen === 'cards';
+      todayBtn.className = 'count-pill today-pill' + (cards ? '' : ' unselected');
+      tomBtn.className = 'count-pill tomorrow-pill' + (cards ? ' unselected' : '');
+      todayBtn.setAttribute('aria-pressed', cards ? 'true' : 'false');
+      tomBtn.setAttribute('aria-pressed', cards ? 'false' : 'true');
+      var target = cards ? todayBtn : tomBtn;
+      if (document.activeElement !== target) {
+        try { target.focus(); } catch (e) { /* some TV browsers refuse — fine */ }
       }
-      el('todayZone').style.opacity = '1';
-      el('listsZone').style.opacity = '1';
     }
 
-    function advanceScreens() {
-      var fromZone = el(state.screen === 'cards' ? 'todayZone' : 'listsZone');
-      fromZone.style.opacity = '0';
-      // Guarded: any pending swap is cleared before a new one is queued,
-      // so timers can never stack.
-      if (state.screenFadeTimer) clearTimeout(state.screenFadeTimer);
-      state.screenFadeTimer = setTimeout(function() {
-        state.screenFadeTimer = null;
-        // A refresh may have emptied today's dogs while this fade was pending.
-        // With no today dogs, rotation is parked (board pinned to lists, or
-        // the empty/offline view is up) — never complete a stale swap over
-        // that state.
-        if (state.todayDogs.length === 0) {
-          fromZone.style.opacity = '1';
-          return;
-        }
-        state.screen = (state.screen === 'cards') ? 'lists' : 'cards';
-        state.screenSeconds = 0;
-        fromZone.style.opacity = '1'; // reset the now-hidden zone for next time
-        var toZone = el(state.screen === 'cards' ? 'todayZone' : 'listsZone');
-        // Opacity must hit 0 BEFORE the render/fit makes the zone visible:
-        // the fit's forced reflows would otherwise commit opacity 1 first,
-        // and the later 0->1 write only retargets a just-started transition —
-        // the screen would pop in with a hard cut instead of fading.
-        toZone.style.opacity = '0';
+    /**
+     * Selects a page ('cards' | 'lists'). fromUser=true marks the choice
+     * sticky (renders stop applying defaults until midnight resets it).
+     * Re-renders only while the board view is actually up — with zero dogs
+     * the empty/offline state stays; the choice still sticks for later.
+     */
+    function selectScreen(which, fromUser) {
+      if (fromUser) state.userSelected = true;
+      var changed = state.screen !== which;
+      state.screen = which;
+      if (changed && (state.todayDogs.length > 0 || state.tomorrowDogs.length > 0)) {
         renderActiveScreen();
-        void toZone.offsetHeight;
-        toZone.style.opacity = '1';
-      }, FADE_MS);
+      }
+      updatePillSelection();
+    }
+
+    /**
+     * Remote arrows work from anywhere on the page (some TV browsers pass
+     * raw key events instead of doing spatial navigation): ◄ = TODAY,
+     * ► = TOMORROW & PREP LIST — deterministic (matches the pills' on-screen
+     * order), so an arrow press lands the same page whether or not the
+     * browser also moved focus. OK/Enter on a focused pill fires its native
+     * click. Checks e.key AND e.keyCode: old TV WebKits only set keyCode.
+     */
+    function handleRemoteKey(e) {
+      var key = e.key || '';
+      var code = e.keyCode || 0;
+      if (key === 'ArrowLeft' || code === 37) {
+        selectScreen('cards', true);
+      } else if (key === 'ArrowRight' || code === 39) {
+        selectScreen('lists', true);
+      } else {
+        return;
+      }
+      if (e.preventDefault) e.preventDefault();
     }
 
     // ============================================================
@@ -1953,8 +1999,11 @@
         el('countdown').textContent = formatCountdown(state.nextRefreshTime - now.getTime());
       }
 
-      // Midnight rollover: re-classify today/tomorrow without a reload
+      // Midnight rollover: re-classify today/tomorrow without a reload. The
+      // manual page choice resets too — yesterday's "TOMORROW & PREP LIST"
+      // page is about today now, so the default logic picks the page afresh.
       if (state.dayStamp && dateStamp(now) !== state.dayStamp && state.lastGoodData) {
+        state.userSelected = false;
         renderBoard();
       }
 
@@ -1978,23 +2027,8 @@
         loadData();
       }
 
-      // Screen rotation on a steady rhythm — only while the CARDS screen has
-      // dogs to show. With only arrivals in the system renderBoard pins the
-      // lists screen (rotating to an empty cards shell helps nobody), and
-      // with no dogs at all the board view isn't up. The counter resets while
-      // rotation is parked so a returning board always gets its full dwell,
-      // and renderBoard cancels any mid-flight swap when it leaves the board
-      // view — rotation can never drag the offline/empty state away.
-      if (state.lastGoodData && state.todayDogs.length > 0) {
-        state.screenSeconds++;
-        var dwell = state.screen === 'cards' ? CARDS_SCREEN_SECONDS : LISTS_SCREEN_SECONDS;
-        if (state.screenSeconds >= dwell) {
-          state.screenSeconds = 0;
-          advanceScreens();
-        }
-      } else {
-        state.screenSeconds = 0;
-      }
+      // No page rotation: the selected page stays until a remote press picks
+      // the other one (handleRemoteKey / the pill buttons).
     }
 
     // ============================================================
@@ -2014,6 +2048,13 @@
     function boot() {
       fitToScreen();
       window.addEventListener('resize', fitToScreen);
+      // Page-select inputs: pill clicks (cursor-mode remotes, and focus+OK —
+      // OK on a focused <button> fires its native click) plus raw arrow keys
+      // for browsers that pass key events straight through.
+      el('todayPillBtn').addEventListener('click', function() { selectScreen('cards', true); });
+      el('tomorrowPillBtn').addEventListener('click', function() { selectScreen('lists', true); });
+      document.addEventListener('keydown', handleRemoteKey);
+      updatePillSelection();
       // Restore the last good payload so the board is never blank on
       // startup, even if the first fetch fails (e.g. overnight outage).
       try {

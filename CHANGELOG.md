@@ -2,6 +2,16 @@
 
 Deployed to GitHub Pages 2026-07-26: commits `424a336` (docs) + `40612c4` (board), verified serving live. The TV browser needs one manual refresh after any deploy (the page never reloads itself).
 
+## Same-day revision (evening): manual page selection replaces auto-rotation
+
+- **Auto-rotation removed entirely** (owner request): the board stays on the chosen page until the other button is pressed.
+- The header count pills are now real **remote-driven buttons**: **TODAY** (cards page) and **TOMORROW & PREP LIST** (renamed — that page holds tomorrow's arrivals AND today's feed-prep checklist). Selected pill = filled; other = ghost outline; hint line "◄ ► or OK on the remote changes page".
+- **Three input paths**, all reaching `selectScreen()` (TV browsers vary): pill click (cursor-mode remotes), focus + OK (pills are focusable buttons; focus follows the selection so OK always has a target), and raw ◄/► arrow keys anywhere (deterministic: ◄=TODAY ►=TOMORROW, `e.key` + `e.keyCode` both checked for old WebKits).
+- **Selection rules:** an explicit press is sticky (renders never override it); defaults until then = TODAY, or TOMORROW & PREP LIST when only arrivals exist; midnight resets the manual choice (yesterday's "tomorrow" page is about today).
+- Page content, card layout, feeding info and dog counts unchanged.
+- Verified: 18 headless-Chrome scenarios green, incl. click-path selection, ArrowRight/ArrowLeft toggle, a 70-virtual-second no-rotation hold, and the arrivals-only default; zero errors/overflows/truncation throughout.
+- ⚠️ The physical remote's input mode (cursor vs spatial-nav vs raw keys) needs one on-TV confirmation — all three paths are wired, but which one the Hisense browser uses is only observable on the device.
+
 ## Rollback
 
 ```
