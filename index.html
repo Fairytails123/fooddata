@@ -13,8 +13,12 @@
        Optimised for Hisense 40" 40E4QTUK FHD (1920x1080), wall-mounted,
        read by staff from 3-5 metres. Dark theme for distance legibility.
 
-       Layout: header band -> TODAY zone (dominant, paged 4x2 grid)
-               -> TOMORROW strip (compact, single paged row).
+       Layout: header band -> one of two ROTATING SCREENS:
+         CARDS screen — every dog staying today on ONE page (alphabetical,
+           per-card auto-sized so nothing is ever truncated), full height;
+         LISTS screen — two big alphabetical lists: FEED PREP (all of
+           today's dogs, checkbox bullets, MEDS/ALLERGY flags) and
+           ARRIVING TOMORROW. Cards dominate the cycle (45s vs 15s).
        Dogs beyond tomorrow are filtered out client-side.
 
        No-scroll TV dashboard — everything fits one 1920x1080 screen.
@@ -47,13 +51,13 @@
       /* School (boarding school) marker */
       --school: #8B5CF6;
 
-      /* Dynamic — set by JS. --tz is measured & grown per page by fitTodayZone()
-         to fill the screen; --med-clamp / --notes-clamp are generous line
-         ceilings that trimOverflowingCards() only tightens on dense pages. */
-      --tz: 1; /* Today-zone font scale (fit grows it up from this floor) */
+      /* Dynamic — set by JS. --tz is measured & sized PER CARD by fitTodayZone()
+         to fill each card's cell; --med-clamp / --notes-clamp are generous line
+         ceilings that trimOverflowingCards() only tightens as a last resort. */
+      --tz: 1; /* Today-zone font scale (per-card fit overrides this) */
       /* High line ceilings so the clamp itself never truncates real data — the
          per-card auto-fit shrinks the font until the FULL med/notes fit, and
-         trimOverflowingCards() only reduces these as a last resort on dense pages. */
+         trimOverflowingCards() only reduces these if even TZ_MIN overflows. */
       --med-clamp: 12;
       --notes-clamp: 12;
       --qty-clamp: 8;
@@ -310,21 +314,16 @@
     .zone-title.tomorrow-title { color: var(--ft-amber); font-size: 19px; }
     .zone-title.tomorrow-title .zone-rule { background: var(--ft-amber); }
 
-    .page-indicator {
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--text-dim);
-      letter-spacing: 1px;
-    }
-
     /* ============================================================
-       TODAY ZONE — dominant, paged grid
+       TODAY ZONE — the CARDS screen (never paged)
        ============================================================ */
     .today-zone {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-height: 0;
+      opacity: 1;
+      transition: opacity 0.35s ease; /* screen-rotation fade */
     }
 
     .today-grid {
@@ -338,11 +337,14 @@
 
     /* Layout classes set ONLY the grid geometry (columns x rows). The font
        scale (--tz) is no longer pinned per-count: fitTodayZone() measures the
-       rendered cards and GROWS --tz (from a floor of 1) until they fill the
-       available height, so a near-empty board reads BIG and complete instead
-       of small and clipped. Column choice (JS todayLayoutClass): 1=g1, 2=g2,
+       rendered cards and sizes EACH one to the largest scale that shows ALL of
+       its text, so a near-empty board reads BIG and a packed board shrinks
+       instead of truncating. Column choice (JS todayLayoutClass): 1=g1, 2=g2,
        3=g3, 4=g4, 5-6=g6, 7-8=g8 (4x2 — taller cards let long meds grow),
-       9=g9 (3x3), 10+=g8 paged. */
+       9=g9 (3x3), 10=g10 (5x2), 11-12=g12 (4x3), 13-15=g15 (5x3),
+       16-18=g18 (6x3), 19-20=g20 (5x4). Never paged — beyond the 20-dog
+       design ceiling applyTodayLayout() derives an inline cols x rows so the
+       board STILL renders one page (cards just get smaller). */
     .today-grid.g1 { grid-template-columns: minmax(0, 1100px); grid-template-rows: minmax(0, 1fr); justify-content: center; }
     .today-grid.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
     .today-grid.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
@@ -350,16 +352,23 @@
     .today-grid.g6 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
     .today-grid.g8 { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
     .today-grid.g9 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+    .today-grid.g10 { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    .today-grid.g12 { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+    .today-grid.g15 { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+    .today-grid.g18 { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+    .today-grid.g20 { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); }
 
-    /* Density relief for the 4-column layout (g8 = 7-8 dogs single page, or any
-       paged page of 8). Food-type tags duplicate the quantity rows, so they and
-       a med card's lower-priority notes give way first; the type pill and head
-       padding tighten. The auto-fit + trimOverflowingCards() still guarantee
-       nothing is chopped mid-line. */
-    .today-grid.g8 .meta-row .food-tag { display: none; }
-    .today-grid.g8 .type-pill { font-size: 14px; padding: 2px 7px; }
-    .today-grid.g8 .tcard-head { padding: 10px 16px 6px; }
-    .today-grid.g8 .tcard-body { gap: 6px; padding: 0 16px 12px; }
+    /* Density relief for packed layouts (g8 = 7-8 dogs, and every 10+ layout
+       via the JS-added "dense" class). Food-type tags duplicate the quantity
+       rows, so they give way; the type pill and head padding tighten. The
+       auto-fit + trimOverflowingCards() still guarantee nothing is chopped
+       mid-line. */
+    .today-grid.g8 .meta-row .food-tag, .today-grid.dense .meta-row .food-tag { display: none; }
+    .today-grid.g8 .type-pill, .today-grid.dense .type-pill { font-size: 14px; padding: 2px 7px; }
+    .today-grid.g8 .tcard-head, .today-grid.dense .tcard-head { padding: 10px 16px 6px; }
+    .today-grid.g8 .tcard-body, .today-grid.dense .tcard-body { gap: 6px; padding: 0 16px 12px; }
+    /* Tighter gutters at 10+ so more of the fixed canvas goes to the cards. */
+    .today-grid.dense { gap: 10px; }
     /* Note: med-card notes are NOT pre-hidden here — the per-card auto-fit shows
        them when there's room and trimOverflowingCards() sheds them only when a
        card genuinely cannot fit, so a 7-8 dog page keeps med-card notes. */
@@ -471,21 +480,6 @@
       align-items: center;
       gap: calc(8px * var(--tz));
       flex-shrink: 0;
-    }
-
-    /* Day badge — only tomorrow cards use it now (today cards dropped the
-       redundant "TODAY" badge; the zone header marks them). */
-    .day-badge {
-      font-weight: 900;
-      letter-spacing: 1.5px;
-      border-radius: 10px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .day-badge.tomorrow-badge {
-      background: var(--ft-amber);
-      color: #3A2A00;
     }
 
     .tcard-body {
@@ -689,108 +683,122 @@
     }
 
     /* ============================================================
-       TOMORROW STRIP — compact, clearly separated
+       LISTS SCREEN — feed-prep checklist + tomorrow's arrivals.
+       Gets its own rotation slot so the cards screen keeps the whole
+       canvas. Both lists are alphabetical; --lz is the per-panel font
+       scale, sized by renderNameList()/bisectScale() so every name shows.
        ============================================================ */
-    .tomorrow-zone {
-      flex-shrink: 0;
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 2px solid rgba(255, 183, 3, 0.35);
-    }
-
-    .tomorrow-grid {
-      display: grid;
-      gap: 14px;
-      height: 168px;
+    .lists-zone {
+      flex: 1;
+      display: flex;
+      gap: 36px;
+      min-height: 0;
       opacity: 1;
-      transition: opacity 0.35s ease;
+      transition: opacity 0.35s ease; /* screen-rotation fade */
     }
 
-    .tomorrow-grid.s1 { grid-template-columns: minmax(0, 560px); }
-    .tomorrow-grid.s2 { grid-template-columns: repeat(2, minmax(0, 560px)); }
-    .tomorrow-grid.s3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .tomorrow-grid.s4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .tomorrow-grid.s5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-
-    .scard {
-      background: linear-gradient(150deg, #1C2236 0%, #141B2C 60%);
-      border: 1px solid rgba(255, 183, 3, 0.4);
-      border-left: 8px solid var(--ft-amber);
-      border-radius: 14px;
-      padding: 12px 16px;
+    .list-panel {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 7px;
       min-width: 0;
+      min-height: 0;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(0, 180, 216, 0.25);
+      border-radius: 16px;
+      padding: 22px 30px;
+    }
+
+    .list-panel.tomorrow-panel { border-color: rgba(255, 183, 3, 0.35); }
+
+    .list-panel .zone-bar { margin-bottom: 14px; }
+
+    .name-list {
+      --lz: 1;
+      flex: 1;
+      min-height: 0;
       overflow: hidden;
+      -webkit-column-gap: 44px; /* old TV WebKit — same reason as -webkit-transform */
+      column-gap: 44px;
     }
 
-    .scard-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-
-    .scard-name {
-      flex: 1 1 auto;
-      font-size: 32px;
-      font-weight: 900;
-      color: var(--text);
-      line-height: 1.3; /* room for tall Nunito-900 glyphs (see .tcard-name) */
+    .list-item {
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: 0 0.25em;
-      min-width: 0;
+      gap: calc(6px * var(--lz)) calc(12px * var(--lz));
+      padding: calc(7px * var(--lz)) 0;
+      font-size: calc(36px * var(--lz));
+      font-weight: 800;
+      line-height: 1.3;
+      color: var(--text);
+      break-inside: avoid;
+      -webkit-column-break-inside: avoid;
     }
 
-    .scard .type-pill {
-      font-size: 13px;
-      padding: 1px 7px;
-    }
-
-    .scard .day-badge.tomorrow-badge {
-      font-size: 19px;
-      padding: 4px 11px;
+    /* Tick-box bullet — the prep list reads as a physical checklist */
+    .prep-box {
+      width: 0.7em;
+      height: 0.7em;
+      border: 3px solid var(--text-faint);
+      border-radius: 5px;
       flex-shrink: 0;
+      align-self: center;
     }
 
-    .scard-line {
-      font-size: 22px;
+    /* overflow:hidden so a single token longer than the column at the --lz
+       floor clips cleanly inside its own column instead of overlapping the
+       next column's text (listFits' per-span check backs --lz off first). */
+    .list-name { min-width: 0; overflow: hidden; }
+
+    .list-surname {
+      font-size: 0.62em;
       font-weight: 700;
       color: var(--text-dim);
-      white-space: nowrap;
+      min-width: 0;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
 
-    .scard-line .scard-meals { color: var(--ft-cyan); font-weight: 800; }
-
-    .scard .med-chip {
-      padding: 5px 10px;
-      gap: 8px;
-      align-items: center;
-      margin-top: auto;
+    .list-flag {
+      font-size: 0.5em;
+      font-weight: 900;
+      letter-spacing: 1px;
+      padding: 0.15em 0.55em;
+      border-radius: 6px;
+      flex-shrink: 0;
+      align-self: center;
+      white-space: nowrap;
     }
 
-    .scard .med-chip svg { width: 20px; height: 20px; margin-top: 0; }
+    .list-flag.med { background: var(--med-red); color: #fff; }
+    .list-flag.allergy, .list-flag.norecord { background: var(--allergy-amber); color: #3A2A00; }
 
-    .scard .med-chip .med-text {
-      font-size: 20px;
-      -webkit-line-clamp: 1;
+    /* Full-width detail line under an ARRIVING TOMORROW name — arrivals have
+       no card on either screen, so med/allergy detail must live here. */
+    .list-detail {
+      flex-basis: 100%;
+      font-size: 0.55em;
+      font-weight: 700;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+      min-width: 0;
     }
+    .list-detail.med-detail { color: #FF9DAB; }
+    .list-detail.allergy-detail { color: #FFD477; }
 
-    .scard .no-match-banner { padding: 6px 10px; margin-top: auto; }
-    .scard .no-match-banner svg { width: 20px; height: 20px; }
-    .scard .no-match-banner .no-match-text { font-size: 20px; }
-
-    /* At 4-5 strip cards the badge slims down and the type pill goes,
-       so names always stay legible (the zone header still says TOMORROW). */
-    .tomorrow-grid.s4 .type-pill, .tomorrow-grid.s5 .type-pill { display: none; }
-    .tomorrow-grid.s4 .day-badge.tomorrow-badge,
-    .tomorrow-grid.s5 .day-badge.tomorrow-badge { font-size: 16px; padding: 3px 9px; letter-spacing: 1px; }
+    /* Honest-failure banner: shown only if a list cannot fit even at LZ_MIN
+       with 4 columns — silent clipping is never OK on a safety checklist. */
+    .list-clip-warn {
+      display: none;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #3A2A00;
+      background: var(--allergy-amber);
+      border-radius: 8px;
+      padding: 4px 10px;
+      white-space: nowrap;
+    }
 
     /* Zone-level empty messages */
     .zone-empty {
@@ -803,7 +811,7 @@
     }
 
     .today-zone .zone-empty { flex: 1; }
-    .tomorrow-zone .zone-empty { height: 168px; }
+    .list-panel .zone-empty { flex: 1; }
 
     /* ============================================================
        LOADING / EMPTY / ERROR STATES
@@ -913,19 +921,28 @@
     <div class="today-zone" id="todayZone" style="display:none;">
       <div class="zone-bar">
         <div class="zone-title today-title"><span class="zone-rule"></span>STAYING TODAY</div>
-        <div class="page-indicator" id="todayPageIndicator"></div>
       </div>
       <div class="today-grid" id="todayGrid"></div>
       <div class="zone-empty" id="todayEmpty">No dogs boarding today</div>
     </div>
 
-    <div class="tomorrow-zone" id="tomorrowZone" style="display:none;">
-      <div class="zone-bar">
-        <div class="zone-title tomorrow-title"><span class="zone-rule"></span>ARRIVING TOMORROW</div>
-        <div class="page-indicator" id="tomorrowPageIndicator"></div>
+    <div class="lists-zone" id="listsZone" style="display:none;">
+      <div class="list-panel prep-panel">
+        <div class="zone-bar">
+          <div class="zone-title today-title"><span class="zone-rule"></span>FEED PREP — IN TONIGHT</div>
+          <span class="list-clip-warn" id="prepClipWarn">⚠ LIST TOO LONG — SOME NAMES CLIPPED</span>
+        </div>
+        <div class="name-list" id="prepList"></div>
+        <div class="zone-empty" id="prepEmpty">No dogs in tonight</div>
       </div>
-      <div class="tomorrow-grid" id="tomorrowGrid"></div>
-      <div class="zone-empty" id="tomorrowEmpty">No new arrivals tomorrow</div>
+      <div class="list-panel tomorrow-panel">
+        <div class="zone-bar">
+          <div class="zone-title tomorrow-title"><span class="zone-rule"></span>ARRIVING TOMORROW</div>
+          <span class="list-clip-warn" id="tomorrowClipWarn">⚠ LIST TOO LONG — SOME NAMES CLIPPED</span>
+        </div>
+        <div class="name-list" id="tomorrowList"></div>
+        <div class="zone-empty" id="tomorrowListEmpty">No new arrivals tomorrow</div>
+      </div>
     </div>
 
   </div>
@@ -951,28 +968,32 @@
     // is abandoned after this long so refreshes can never be wedged permanently.
     var FETCH_TIMEOUT_MS = 90 * 1000;
 
-    // Page cycling rhythm for both zones (seconds per page).
-    var PAGE_SECONDS = 12;
+    // Screen rotation. The board alternates between the CARDS screen (every dog
+    // staying today, one page, full height — the safety-critical view) and the
+    // LISTS screen (alphabetical feed-prep checklist + tomorrow's arrivals).
+    // Cards dominate the cycle; the lists get a short slot. Dog cards are NEVER
+    // paged — a full house just makes each card smaller (see TZ_MIN).
+    var CARDS_SCREEN_SECONDS = 45;
+    var LISTS_SCREEN_SECONDS = 15;
     var FADE_MS = 360;
-
-    // Per-page capacities. Up to SINGLE_PAGE_MAX dogs share ONE page (sized by
-    // todayLayoutClass so cards are as large as possible); beyond that the board
-    // pages in groups of TODAY_PER_PAGE (4 cols x 2 rows) so cards never shrink
-    // below the dense floor.
-    var SINGLE_PAGE_MAX = 9;
-    var TODAY_PER_PAGE = 8;
-    var TOMORROW_PER_PAGE = 5;
 
     // Auto-fit bounds. fitTodayZone() sizes EACH card independently: it grows a
     // card's font scale (--tz) up to TZ_MAX to fill its cell (a near-empty card
-    // reads huge) or shrinks it down to TZ_MIN so a long medication shows in
-    // FULL rather than being clamped. Only when even TZ_MIN overflows does
-    // trimOverflowingCards() shed lower-priority content. Per-card (not one
-    // global scale) is what stops a single very busy card — e.g. a 150-char med
-    // list — from pinning every other card small. FIT_ITERS bisections per card.
-    var TZ_MIN = 0.85;
+    // reads huge) or shrinks it toward TZ_MIN so a long medication shows in
+    // FULL rather than being clamped. The floor is deliberately LOW (owner
+    // decision 2026-07-26: shrink as far as needed, never truncate) — on a
+    // packed board a wordy card gets small text rather than hidden text. Only
+    // when even TZ_MIN overflows does trimOverflowingCards() shed lower-
+    // priority content. Per-card (not one global scale) is what stops a single
+    // very busy card — e.g. a 150-char med list — from pinning every other
+    // card small. FIT_ITERS bisections per card.
+    var TZ_MIN = 0.3;
     var TZ_MAX = 2.2;
-    var FIT_ITERS = 7;
+    var FIT_ITERS = 8;
+
+    // Same idea for the lists screen: --lz is the per-panel list font scale.
+    var LZ_MIN = 0.4;
+    var LZ_MAX = 1.5;
 
     var CACHE_KEY = 'ftFeedingBoardLastGood';
 
@@ -993,16 +1014,17 @@
       fetchSeq: 0,            // watchdog: invalidates abandoned fetches
       nextRefreshTime: null,
       dayStamp: '',           // 'YYYY-MM-DD' — change triggers midnight re-classification
-      todayDogs: [],
-      tomorrowDogs: [],
-      todayPage: 0,
-      tomorrowPage: 0,
-      todayPages: 1,
-      tomorrowPages: 1,
-      todayPerPage: TODAY_PER_PAGE, // dogs per today page (= count when single-page)
-      cycleSeconds: 0,
-      todayFadeTimer: null,
-      tomorrowFadeTimer: null
+      todayDogs: [],          // alphabetical (sortDogsAlpha) — the display order
+      tomorrowDogs: [],       // alphabetical
+      screen: 'cards',        // 'cards' | 'lists' — which rotation screen shows
+      screenSeconds: 0,       // seconds the current screen has been up
+      screenFadeTimer: null,
+      // Data-version stamps: rotation swaps skip the rebuild (innerHTML +
+      // ~9 forced reflows per card) when a screen was already rendered for
+      // the current data — the swap becomes a pure display/opacity toggle.
+      renderVersion: 0,
+      todayRenderedVersion: -1,
+      listsRenderedVersion: -1
     };
 
     // Wrapped so the clock source is a single seam (and testable).
@@ -1079,8 +1101,9 @@
     }
 
     /**
-     * De-duplicates dogs (same name + surname) across both zones, preserving
-     * backend order (medication dogs first). Priority when records collide:
+     * De-duplicates dogs (same name + surname) across both zones. Output
+     * order is irrelevant (renderBoard re-sorts with sortDogsAlpha) — only
+     * WHICH record wins matters. Priority when records collide:
      * today-zone beats tomorrow-zone, then medication, then matched,
      * then the later check-in.
      */
@@ -1124,6 +1147,23 @@
       }
 
       return result;
+    }
+
+    /**
+     * Alphabetical display order: dog first name, then owner surname to break
+     * ties (two Rubys). The backend still sends medication dogs first — that
+     * order mattered when the board paged (meds had to land on page 1), but
+     * every dog is on screen at once now, so the board re-sorts into the A-Z
+     * scan staff expect. Case-insensitive.
+     */
+    function sortDogsAlpha(dogs) {
+      // localeCompare, not < : code-point order files 'Ébony' after 'Zeus',
+      // and staff scanning the checklist under E would skip the row.
+      return dogs.slice().sort(function(a, b) {
+        var cmp = (a.dogName || '').toLowerCase().localeCompare((b.dogName || '').toLowerCase());
+        if (cmp) return cmp;
+        return (a.ownerSurname || '').toLowerCase().localeCompare((b.ownerSurname || '').toLowerCase());
+      });
     }
 
     // ============================================================
@@ -1263,13 +1303,19 @@
              '<span class="no-match-text">No feeding record — check JotForm</span></div>';
     }
 
-    /* Dog name + owner surname (surname disambiguates same-named dogs). */
-    function buildDogNameHtml(dog) {
-      var html = '<span class="name-first">' + escapeHtml(dog.dogName) + '</span>';
+    /* Dog name + owner surname (surname disambiguates same-named dogs). The
+       escape-both / surname-optional / never-drop-the-surname contract lives
+       ONLY here — cards and lists both render through it. */
+    function buildNamePartsHtml(dog, firstClass, surnameClass) {
+      var html = '<span class="' + firstClass + '">' + escapeHtml(dog.dogName) + '</span>';
       if (dog.ownerSurname) {
-        html += '<span class="name-surname">' + escapeHtml(dog.ownerSurname) + '</span>';
+        html += '<span class="' + surnameClass + '">' + escapeHtml(dog.ownerSurname) + '</span>';
       }
       return html;
+    }
+
+    function buildDogNameHtml(dog) {
+      return buildNamePartsHtml(dog, 'name-first', 'name-surname');
     }
 
     function buildTodayCard(dog) {
@@ -1306,42 +1352,34 @@
       return html;
     }
 
-    function buildTomorrowCard(dog) {
+    /**
+     * One row of the lists screen: [checkbox] DogName Surname [MEDS] [ALLERGY].
+     * withBox=true adds the prep-checklist tick box (today dogs — their full
+     * detail lives on the cards screen). withDetail=true is for the ARRIVING
+     * TOMORROW list, whose dogs have NO card on either rotation screen: it
+     * prints the medication details and allergy sentence under the name, so
+     * arrival med info is never reduced to a bare flag.
+     */
+    function buildListItem(dog, withBox, withDetail) {
       var feeding = dog.feeding;
-      var stayType = dog.type || 'boarding';
-      var pillClass = 'type-pill' + (stayType === 'school' ? ' school' : '');
-
-      var html = '<div class="scard">';
-      html += '<div class="scard-head">' +
-                '<div class="scard-name">' + buildDogNameHtml(dog) + '</div>' +
-                '<span class="' + pillClass + '">' + getTypeBadgeLabel(stayType) + '</span>' +
-                '<span class="day-badge tomorrow-badge">TOMORROW</span>' +
-              '</div>';
-
-      if (dog.matched && feeding) {
-        var foodBits = [];
-        if (feeding.kibbleSummary) foodBits.push('Kibble: ' + feeding.kibbleSummary);
-        if (feeding.wetFood) foodBits.push('Wet: ' + feeding.wetFood);
-        if (feeding.tinFood) foodBits.push('Tin: ' + feeding.tinFood);
-        if (foodBits.length === 0 && feeding.foodTypes && feeding.foodTypes.length > 0) {
-          foodBits.push(feeding.foodTypes.join(', '));
-        }
-        html += '<div class="scard-line">' +
-                  '<span class="scard-meals">' + formatMealsBadge(feeding.mealsPerDay) + '</span>' +
-                  (foodBits.length ? ' &middot; ' + escapeHtml(foodBits.join(' · ')) : '') +
-                '</div>';
-        if (feeding.medication === 'Yes') {
-          var details = feeding.medicationDetails || MED_FALLBACK_TEXT;
-          html += '<div class="med-chip">' + medIconSVG +
-                    '<div class="med-text"><span class="med-label">Meds:</span> ' + escapeHtml(details) + '</div>' +
-                  '</div>';
-        } else if (hasAllergyNote(feeding)) {
-          html += '<div class="allergy-chip" style="margin-top:auto;">' + allergyIconSVG +
-                    '<span class="allergy-text" style="font-size:20px;">' + escapeHtml(allergyChipText(feeding)) + '</span>' +
-                  '</div>';
-        }
-      } else {
-        html += buildNoMatchBanner();
+      var html = '<div class="list-item">';
+      if (withBox) html += '<span class="prep-box"></span>';
+      html += buildNamePartsHtml(dog, 'list-name', 'list-surname');
+      if (feeding && feeding.medication === 'Yes') {
+        html += '<span class="list-flag med">MEDS</span>';
+      }
+      if (hasAllergyNote(feeding)) {
+        html += '<span class="list-flag allergy">ALLERGY</span>';
+      }
+      if (!dog.matched) {
+        html += '<span class="list-flag norecord">NO RECORD</span>';
+      }
+      if (withDetail && feeding && feeding.medication === 'Yes') {
+        html += '<div class="list-detail med-detail">' +
+                escapeHtml(feeding.medicationDetails || MED_FALLBACK_TEXT) + '</div>';
+      }
+      if (withDetail && hasAllergyNote(feeding)) {
+        html += '<div class="list-detail allergy-detail">' + escapeHtml(allergyChipText(feeding)) + '</div>';
       }
       html += '</div>';
       return html;
@@ -1352,9 +1390,10 @@
     // ============================================================
     function el(id) { return document.getElementById(id); }
 
-    // Column geometry for a SINGLE page of `count` dogs. 7-8 use g8 (4x2): the
-    // taller cards let a long medication grow bigger than a wider-but-shorter
-    // 3-column card would. 9 uses g9 (3x3, full). 10+ never reaches here (paged).
+    // Column geometry for ONE page of `count` dogs — the board NEVER pages.
+    // 7-8 use g8 (4x2): the taller cards let a long medication grow bigger
+    // than a wider-but-shorter 3-column card would. The ladder runs to the
+    // 20-dog design ceiling (g20 = 5x4); applyTodayLayout() handles beyond.
     function todayLayoutClass(count) {
       if (count <= 1) return 'g1';
       if (count === 2) return 'g2';
@@ -1362,60 +1401,72 @@
       if (count === 4) return 'g4';
       if (count <= 6) return 'g6';
       if (count <= 8) return 'g8';
-      return 'g9';
+      if (count === 9) return 'g9';
+      if (count === 10) return 'g10';
+      if (count <= 12) return 'g12';
+      if (count <= 15) return 'g15';
+      if (count <= 18) return 'g18';
+      return 'g20';
     }
 
-    function tomorrowLayoutClass(count) {
-      if (count <= 1) return 's1';
-      if (count === 2) return 's2';
-      if (count === 3) return 's3';
-      if (count === 4) return 's4';
-      return 's5';
+    /**
+     * Applies the one-page grid geometry for `count` dogs. 10+ adds "dense"
+     * (tighter gutters, food-tags hidden — their info is in the qty rows).
+     * Beyond the 20-dog design ceiling there is no class: derive an inline
+     * cols x rows (max 4 rows) so the board still renders every dog on one
+     * page rather than paging or spilling off-screen.
+     */
+    function applyTodayLayout(grid, count) {
+      grid.style.gridTemplateColumns = '';
+      grid.style.gridTemplateRows = '';
+      if (count <= 20) {
+        grid.className = 'today-grid ' + todayLayoutClass(count) + (count >= 10 ? ' dense' : '');
+        return;
+      }
+      var cols = Math.ceil(count / 4);
+      var rows = Math.ceil(count / cols);
+      grid.className = 'today-grid dense';
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+      grid.style.gridTemplateRows = 'repeat(' + rows + ', minmax(0, 1fr))';
     }
 
     function setMainView(view) {
       el('loadingState').style.display = view === 'loading' ? 'flex' : 'none';
       el('emptyState').style.display = view === 'empty' ? 'flex' : 'none';
       el('offlineState').style.display = view === 'offline' ? 'flex' : 'none';
-      el('todayZone').style.display = view === 'board' ? 'flex' : 'none';
-      el('tomorrowZone').style.display = view === 'board' ? 'block' : 'none';
+      // 'board' shows exactly ONE of the two rotation screens.
+      el('todayZone').style.display = (view === 'board' && state.screen === 'cards') ? 'flex' : 'none';
+      el('listsZone').style.display = (view === 'board' && state.screen === 'lists') ? 'flex' : 'none';
     }
 
-    function renderTodayPage() {
+    function renderTodayCards() {
+      // Already rendered for this data version — the rotation swap only needs
+      // the display toggle (fitted --tz values persist in the DOM).
+      if (state.todayRenderedVersion === state.renderVersion) return;
+      state.todayRenderedVersion = state.renderVersion;
+
       var grid = el('todayGrid');
       var emptyMsg = el('todayEmpty');
-      var indicator = el('todayPageIndicator');
       var dogs = state.todayDogs;
 
       if (dogs.length === 0) {
         grid.style.display = 'none';
         emptyMsg.style.display = 'flex';
-        indicator.textContent = '';
         return;
       }
       emptyMsg.style.display = 'none';
       grid.style.display = 'grid';
 
-      // Single page: size the grid to the dog count for the most generous cards.
-      // Multiple pages: every page uses the full 4x2 layout so cards never jump size.
-      var layoutClass = state.todayPages > 1 ? 'g8' : todayLayoutClass(dogs.length);
-      grid.className = 'today-grid ' + layoutClass;
+      applyTodayLayout(grid, dogs.length);
 
-      var perPage = state.todayPerPage || TODAY_PER_PAGE;
-      var start = state.todayPage * perPage;
-      var slice = dogs.slice(start, start + perPage);
       var html = '';
-      for (var i = 0; i < slice.length; i++) html += buildTodayCard(slice[i]);
+      for (var i = 0; i < dogs.length; i++) html += buildTodayCard(dogs[i]);
       grid.innerHTML = html;
       // Grow the font to fill the available space (few dogs / short text), then
-      // shed only what still cannot fit (dense pages). Order matters: fit first
-      // so trim measures the final, chosen scale.
+      // shed only what still cannot fit below the TZ_MIN floor. Order matters:
+      // fit first so trim measures the final, chosen scale.
       fitTodayZone(grid);
       trimOverflowingCards(grid);
-
-      indicator.textContent = state.todayPages > 1
-        ? 'PAGE ' + (state.todayPage + 1) + ' OF ' + state.todayPages
-        : '';
     }
 
     /**
@@ -1452,28 +1503,38 @@
      * to shed. ~9 reflows per card; runs once per page render (never on the 1s
      * tick), so there is no loop and no measurable cost.
      */
-    function fitCard(card) {
-      // Floor first: if even TZ_MIN overflows, leave it there and let trim shed.
-      card.style.setProperty('--tz', TZ_MIN);
-      void card.offsetHeight;
-      if (!cardFits(card)) return;
+    /**
+     * Shared floor/ceiling/bisect used by fitCard (--tz) and the list panels
+     * (--lz): sets `prop` to the largest scale in [min, max] where fitsFn()
+     * holds. Monotonic: a larger scale never reduces content size, so this
+     * cannot oscillate. Returns false when even the floor overflows (the
+     * floor is left set; the caller decides the fallback).
+     */
+    function bisectScale(node, prop, min, max, fitsFn) {
+      node.style.setProperty(prop, min);
+      void node.offsetHeight;
+      if (!fitsFn()) return false;
 
-      // Ceiling: lots of room — take the max and stop.
-      card.style.setProperty('--tz', TZ_MAX);
-      void card.offsetHeight;
-      if (cardFits(card)) return;
+      node.style.setProperty(prop, max);
+      void node.offsetHeight;
+      if (fitsFn()) return true;
 
-      // Otherwise bisect for the largest fitting scale. Monotonic: a larger --tz
-      // never reduces content height, so this cannot oscillate.
-      var lo = TZ_MIN, hi = TZ_MAX;
+      var lo = min, hi = max;
       for (var n = 0; n < FIT_ITERS; n++) {
         var mid = (lo + hi) / 2;
-        card.style.setProperty('--tz', mid);
-        void card.offsetHeight;
-        if (cardFits(card)) lo = mid; else hi = mid;
+        node.style.setProperty(prop, mid);
+        void node.offsetHeight;
+        if (fitsFn()) lo = mid; else hi = mid;
       }
-      card.style.setProperty('--tz', lo);
-      void card.offsetHeight;
+      node.style.setProperty(prop, lo);
+      void node.offsetHeight;
+      return true;
+    }
+
+    function fitCard(card) {
+      // A false return means even TZ_MIN overflows — the floor stays set and
+      // trimOverflowingCards() sheds content.
+      bisectScale(card, '--tz', TZ_MIN, TZ_MAX, function() { return cardFits(card); });
     }
 
     function fitTodayZone(grid) {
@@ -1556,33 +1617,62 @@
       }
     }
 
-    function renderTomorrowPage() {
-      var grid = el('tomorrowGrid');
-      var emptyMsg = el('tomorrowEmpty');
-      var indicator = el('tomorrowPageIndicator');
-      var dogs = state.tomorrowDogs;
+    /**
+     * The LISTS screen: feed-prep checklist (every dog staying today — they
+     * are all in overnight, so every feed gets prepped) and tomorrow's
+     * arrivals (withDetail: their med/allergy text lives HERE — arrivals have
+     * no card on either screen). Both alphabetical.
+     */
+    function renderListsScreen() {
+      if (state.listsRenderedVersion === state.renderVersion) return;
+      state.listsRenderedVersion = state.renderVersion;
+      renderNameList('prepList', 'prepEmpty', 'prepClipWarn', state.todayDogs, true, false);
+      renderNameList('tomorrowList', 'tomorrowListEmpty', 'tomorrowClipWarn', state.tomorrowDogs, false, true);
+    }
 
+    /**
+     * A panel "fits" only when the container overflows on NEITHER axis
+     * (overflow in a fixed column-count box spills into extra off-screen
+     * columns, growing scrollWidth) AND every name span shows in full — a
+     * long name overflowing its own column into the next one never grows the
+     * container, so the per-span check (same idea as cardFits) is what stops
+     * two dogs' names overlapping.
+     */
+    function listFits(list) {
+      if (list.scrollHeight > list.clientHeight + 1 ||
+          list.scrollWidth > list.clientWidth + 1) return false;
+      var parts = list.querySelectorAll('.list-name, .list-surname');
+      for (var p = 0; p < parts.length; p++) {
+        if (parts[p].scrollWidth > parts[p].clientWidth + 1) return false;
+      }
+      return true;
+    }
+
+    function renderNameList(listId, emptyId, warnId, dogs, withBox, withDetail) {
+      var list = el(listId);
+      var emptyMsg = el(emptyId);
+      el(warnId).style.display = 'none';
       if (dogs.length === 0) {
-        grid.style.display = 'none';
+        list.style.display = 'none';
         emptyMsg.style.display = 'flex';
-        indicator.textContent = '';
         return;
       }
       emptyMsg.style.display = 'none';
-      grid.style.display = 'grid';
-
-      var start = state.tomorrowPage * TOMORROW_PER_PAGE;
-      var slice = dogs.slice(start, start + TOMORROW_PER_PAGE);
-      var layoutClass = state.tomorrowPages > 1 ? 's5' : tomorrowLayoutClass(dogs.length);
-      grid.className = 'tomorrow-grid ' + layoutClass;
-
+      list.style.display = 'block';
       var html = '';
-      for (var i = 0; i < slice.length; i++) html += buildTomorrowCard(slice[i]);
-      grid.innerHTML = html;
-
-      indicator.textContent = state.tomorrowPages > 1
-        ? 'PAGE ' + (state.tomorrowPage + 1) + ' OF ' + state.tomorrowPages
-        : '';
+      for (var i = 0; i < dogs.length; i++) html += buildListItem(dogs[i], withBox, withDetail);
+      list.innerHTML = html;
+      // One column reads best; escalate columns — and finally show the clip
+      // banner — only when even the LZ_MIN floor overflows. A safety checklist
+      // must never clip silently.
+      var baseCols = dogs.length > 16 ? 3 : (dogs.length > 8 ? 2 : 1);
+      var fitted = false;
+      for (var cols = baseCols; cols <= 4 && !fitted; cols++) {
+        list.style.columnCount = String(cols);
+        list.style.webkitColumnCount = String(cols); // old TV WebKit
+        fitted = bisectScale(list, '--lz', LZ_MIN, LZ_MAX, function() { return listFits(list); });
+      }
+      if (!fitted) el(warnId).style.display = 'inline-block';
     }
 
     /**
@@ -1628,22 +1718,21 @@
       }
 
       var zones = classifyDogs(data.dogs || []);
-      state.todayDogs = zones.today;
-      state.tomorrowDogs = zones.tomorrow;
-      // Up to SINGLE_PAGE_MAX dogs fit one page (sized big by todayLayoutClass);
-      // beyond that, page in groups of TODAY_PER_PAGE so cards stay legible.
-      state.todayPerPage = zones.today.length <= SINGLE_PAGE_MAX
-        ? Math.max(1, zones.today.length)
-        : TODAY_PER_PAGE;
-      state.todayPages = Math.max(1, Math.ceil(zones.today.length / state.todayPerPage));
-      state.tomorrowPages = Math.max(1, Math.ceil(zones.tomorrow.length / TOMORROW_PER_PAGE));
-      if (state.todayPage >= state.todayPages) state.todayPage = 0;
-      if (state.tomorrowPage >= state.tomorrowPages) state.tomorrowPage = 0;
+      // Alphabetical display order for the cards AND both lists (owner rule
+      // 2026-07-26); the backend's med-first order is only a transport order now.
+      state.todayDogs = sortDogsAlpha(zones.today);
+      state.tomorrowDogs = sortDogsAlpha(zones.tomorrow);
+      state.renderVersion++; // both screens must rebuild for the new data
 
       el('todayCount').textContent = String(zones.today.length);
       el('tomorrowCount').textContent = String(zones.tomorrow.length);
 
       if (zones.today.length === 0 && zones.tomorrow.length === 0) {
+        // Leaving the board view: a mid-flight screen swap must die with it,
+        // or its 360ms callback would force the board view back over the
+        // state chosen here.
+        cancelPendingScreenSwap();
+        state.screenSeconds = 0;
         // With an error in play, "no dogs" would be a misleading factual claim —
         // show the problem state instead of the cheerful empty board.
         if (data.error || state.fetchFailed) {
@@ -1654,18 +1743,30 @@
           setMainView('empty');
         }
       } else {
-        setMainView('board');
-        // Reclaim the tomorrow strip's ~200px for today when nothing arrives
-        // tomorrow — today-zone is flex:1, so collapsing the empty strip lets
-        // the cards grow into that space. Do this BEFORE renderTodayPage so the
-        // auto-fit measures the final available height. Render tomorrow first
-        // for the same reason (its visibility affects today's height).
-        el('tomorrowZone').style.display = (zones.tomorrow.length === 0) ? 'none' : 'block';
-        renderTomorrowPage();
-        renderTodayPage();
+        // Only arrivals in the system: the cards screen would be a bare
+        // "No dogs boarding today" shell, so pin the lists screen (arrivals +
+        // empty prep panel) instead of blanking the board 45s of every minute.
+        // Rotation is parked while today is empty (see masterTick), and a
+        // mid-flight swap is cancelled so its callback can't unpin us.
+        if (zones.today.length === 0) {
+          cancelPendingScreenSwap();
+          state.screen = 'lists';
+        }
+        renderActiveScreen();
       }
 
       updateStatusDisplay();
+    }
+
+    /**
+     * Shows whichever rotation screen is active and renders it. The fit
+     * routines measure layout, so the zone must be visible (display set by
+     * setMainView) BEFORE its render runs — a display:none zone measures 0.
+     */
+    function renderActiveScreen() {
+      setMainView('board');
+      if (state.screen === 'cards') renderTodayCards();
+      else renderListsScreen();
     }
 
     function updateStatusDisplay() {
@@ -1689,33 +1790,53 @@
     }
 
     // ============================================================
-    // PAGE CYCLING — gentle fade, no stacked timers
+    // SCREEN ROTATION — cards <-> lists, gentle fade, no stacked timers
     // ============================================================
-    function advancePages() {
-      if (state.todayPages > 1) {
-        fadeSwap('todayGrid', 'todayFadeTimer', function() {
-          state.todayPage = (state.todayPage + 1) % state.todayPages;
-          renderTodayPage();
-        });
+
+    /**
+     * Cancels a mid-flight screen swap. Called whenever renderBoard leaves
+     * the board view — otherwise the pending 360ms fade callback would fire
+     * later and force setMainView('board') back over the offline/empty
+     * state. Both zones' opacity is restored because a cancelled fade leaves
+     * opacity 0 inline, which would make a future board view invisible.
+     */
+    function cancelPendingScreenSwap() {
+      if (state.screenFadeTimer) {
+        clearTimeout(state.screenFadeTimer);
+        state.screenFadeTimer = null;
       }
-      if (state.tomorrowPages > 1) {
-        fadeSwap('tomorrowGrid', 'tomorrowFadeTimer', function() {
-          state.tomorrowPage = (state.tomorrowPage + 1) % state.tomorrowPages;
-          renderTomorrowPage();
-        });
-      }
+      el('todayZone').style.opacity = '1';
+      el('listsZone').style.opacity = '1';
     }
 
-    function fadeSwap(gridId, timerKey, swapFn) {
-      var grid = el(gridId);
-      grid.style.opacity = '0';
+    function advanceScreens() {
+      var fromZone = el(state.screen === 'cards' ? 'todayZone' : 'listsZone');
+      fromZone.style.opacity = '0';
       // Guarded: any pending swap is cleared before a new one is queued,
       // so timers can never stack.
-      if (state[timerKey]) clearTimeout(state[timerKey]);
-      state[timerKey] = setTimeout(function() {
-        state[timerKey] = null;
-        swapFn();
-        grid.style.opacity = '1';
+      if (state.screenFadeTimer) clearTimeout(state.screenFadeTimer);
+      state.screenFadeTimer = setTimeout(function() {
+        state.screenFadeTimer = null;
+        // A refresh may have emptied today's dogs while this fade was pending.
+        // With no today dogs, rotation is parked (board pinned to lists, or
+        // the empty/offline view is up) — never complete a stale swap over
+        // that state.
+        if (state.todayDogs.length === 0) {
+          fromZone.style.opacity = '1';
+          return;
+        }
+        state.screen = (state.screen === 'cards') ? 'lists' : 'cards';
+        state.screenSeconds = 0;
+        fromZone.style.opacity = '1'; // reset the now-hidden zone for next time
+        var toZone = el(state.screen === 'cards' ? 'todayZone' : 'listsZone');
+        // Opacity must hit 0 BEFORE the render/fit makes the zone visible:
+        // the fit's forced reflows would otherwise commit opacity 1 first,
+        // and the later 0->1 write only retargets a just-started transition —
+        // the screen would pop in with a hard cut instead of fading.
+        toZone.style.opacity = '0';
+        renderActiveScreen();
+        void toZone.offsetHeight;
+        toZone.style.opacity = '1';
       }, FADE_MS);
     }
 
@@ -1857,11 +1978,22 @@
         loadData();
       }
 
-      // Page cycling on a steady rhythm
-      state.cycleSeconds++;
-      if (state.cycleSeconds >= PAGE_SECONDS) {
-        state.cycleSeconds = 0;
-        advancePages();
+      // Screen rotation on a steady rhythm — only while the CARDS screen has
+      // dogs to show. With only arrivals in the system renderBoard pins the
+      // lists screen (rotating to an empty cards shell helps nobody), and
+      // with no dogs at all the board view isn't up. The counter resets while
+      // rotation is parked so a returning board always gets its full dwell,
+      // and renderBoard cancels any mid-flight swap when it leaves the board
+      // view — rotation can never drag the offline/empty state away.
+      if (state.lastGoodData && state.todayDogs.length > 0) {
+        state.screenSeconds++;
+        var dwell = state.screen === 'cards' ? CARDS_SCREEN_SECONDS : LISTS_SCREEN_SECONDS;
+        if (state.screenSeconds >= dwell) {
+          state.screenSeconds = 0;
+          advanceScreens();
+        }
+      } else {
+        state.screenSeconds = 0;
       }
     }
 
