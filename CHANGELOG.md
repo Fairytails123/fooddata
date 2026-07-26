@@ -2,6 +2,13 @@
 
 Deployed to GitHub Pages 2026-07-26: commits `424a336` (docs) + `40612c4` (board), verified serving live. The TV browser needs one manual refresh after any deploy (the page never reloads itself).
 
+## Same-day revision (night): supplements split, selection-state fixes, security hardening
+
+- **Prescription medication vs training supplements are now separate.** The red MEDICATION chip is prescription-only; the new JotForm "Training Supplements" checklist (Hemp Oil / Multivitamin Tabs / Probiotic Powder/Tab / Calming Tabs) renders as its own green SUPPLEMENTS subcard inside the dog card, between the allergy chip and the food rows. Backend parses the new field (deployed via clasp onto the existing web-app deployment); frontend guards for older cached payloads without the field. Takes visual effect per-record as staff adopt the checklist — existing records still carry supplement text inside Medication Details until edited.
+- **Selection-state fixes from the adversarial review of the manual-selection build:** the midnight reset of a manual page choice now works even during a no-data outage; the "never park on a bare cards shell while arrivals exist" rule is a hard per-render pin again (overriding a sticky choice — the arrivals' med detail lives only on the lists page) with a pointer message if the empty page is manually visited; a visibly no-op press no longer silently sets the sticky flag; **OK/Enter now toggles the page** (previously OK could be a no-op on focus-driven TV browsers), and the hint text was made glyph-safe ("Remote arrows or OK change the page"); dead rotation-era CSS/comments removed; old-WebKit fallbacks for the pill buttons.
+- **Security hardening:** the backend `.gs` was removed from this public repo (gitignored; it contains API credentials and the repo is Pages-served). The local file is now a mirror of the LIVE Apps Script — which also carries a check-in/out snapshot layer the old repo copy lacked (caught by a pre-push drift check). Credential rotation tracked separately.
+- Verified: 19 headless-Chrome scenarios green (supplements on sparse/dense/worst-case cards, supplements-only dog shows no red chip, OK-toggle, arrow toggle, no-rotation hold, arrivals-only pin); live API re-verified 200 after the backend redeploy.
+
 ## Same-day revision (evening): manual page selection replaces auto-rotation
 
 - **Auto-rotation removed entirely** (owner request): the board stays on the chosen page until the other button is pressed.

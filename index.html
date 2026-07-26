@@ -161,6 +161,7 @@
        <button> elements so cursor-mode TV browsers can click them and
        spatial-nav browsers can focus them and send OK. */
     .count-pill {
+      display: inline-block; /* old TV WebKit fallback — flex-in-button is patchy there */
       display: inline-flex;
       align-items: baseline;
       gap: 8px;
@@ -374,8 +375,6 @@
       display: grid;
       gap: calc(16px * var(--tz)); /* breathes with the cards as --tz grows */
       min-height: 0;
-      opacity: 1;
-      transition: opacity 0.35s ease;
     }
 
     /* Layout classes set ONLY the grid geometry (columns x rows). The font
@@ -594,6 +593,40 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    /* Training-dog supplements (JotForm checklist qid 61) — their own subcard
+       so routine wellness items never blur into the RED prescription
+       medication chip. Green family = routine, not an alert. */
+    .supp-block {
+      padding: calc(6px * var(--tz)) calc(12px * var(--tz));
+      background: rgba(16, 185, 129, 0.10);
+      border-left: 5px solid #10B981;
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 0;
+      /* Same rationale as .notes-block: never flex-shrink, or the block would
+         clip its own text while the body still "fits", hiding it from the
+         auto-fit. Unfit supplements must overflow the body so fitCard sees it. */
+      flex-shrink: 0;
+    }
+
+    .supp-label {
+      font-size: calc(15px * var(--tz));
+      font-weight: 800;
+      color: #6EE7B7;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 2px;
+    }
+
+    .supp-text {
+      font-size: calc(26px * var(--tz));
+      font-weight: 700;
+      color: #C7F5E4;
+      line-height: 1.25; /* clears Nunito's ~1.23em glyphs under overflow:hidden */
+      overflow-wrap: anywhere;
+      min-width: 0;
     }
 
     /* Quantity rows — the core feeding details */
@@ -927,7 +960,7 @@
           <button type="button" class="count-pill today-pill" id="todayPillBtn" aria-pressed="true"><span class="count-num" id="todayCount">—</span> TODAY</button>
           <button type="button" class="count-pill tomorrow-pill unselected" id="tomorrowPillBtn" aria-pressed="false"><span class="count-num" id="tomorrowCount">—</span> TOMORROW &amp; PREP LIST</button>
         </div>
-        <div class="pill-hint">◄ ► or OK on the remote changes page</div>
+        <div class="pill-hint">Remote arrows or OK change the page</div>
       </div>
       <div class="header-right">
         <div class="clock-block">
@@ -1333,6 +1366,24 @@
              '</div>';
     }
 
+    /**
+     * Training-dog supplements subcard (green) — deliberately SEPARATE from
+     * the red medication chip, which stays prescription-only. Guarded for
+     * records parsed before the field existed (stale caches have no
+     * `supplements` key). Values come from the JotForm checklist verbatim.
+     */
+    function buildSupplementsBlock(feeding) {
+      var supps = feeding.supplements;
+      if (!supps || supps.length === 0) return '';
+      var parts = [];
+      for (var i = 0; i < supps.length; i++) {
+        if (supps[i]) parts.push(escapeHtml(String(supps[i])));
+      }
+      if (parts.length === 0) return '';
+      return '<div class="supp-block"><div class="supp-label">Supplements</div>' +
+             '<div class="supp-text">' + parts.join(' &middot; ') + '</div></div>';
+    }
+
     function buildAllergyChip(feeding) {
       if (!hasAllergyNote(feeding)) return '';
       return '<div class="allergy-chip">' + allergyIconSVG +
@@ -1378,9 +1429,11 @@
 
       html += '<div class="tcard-body">';
       if (dog.matched && feeding) {
-        // Safety-critical chips first so they are never clipped.
+        // Safety-critical chips first so they are never clipped; supplements
+        // sit below them (routine, not an alert) but above the food rows.
         html += buildMedChip(feeding);
         html += buildAllergyChip(feeding);
+        html += buildSupplementsBlock(feeding);
         html += buildQuantityRows(feeding);
         html += '<div class="meta-row">' +
                   '<span class="meals-pill">' + formatMealsBadge(feeding.mealsPerDay) + '</span>' +
@@ -1397,8 +1450,8 @@
     /**
      * One row of the lists screen: [checkbox] DogName Surname [MEDS] [ALLERGY].
      * withBox=true adds the prep-checklist tick box (today dogs — their full
-     * detail lives on the cards screen). withDetail=true is for the ARRIVING
-     * TOMORROW list, whose dogs have NO card on either rotation screen: it
+     * detail lives on the cards page). withDetail=true is for the ARRIVING
+     * TOMORROW list, whose dogs have NO card on either page: it
      * prints the medication details and allergy sentence under the name, so
      * arrival med info is never reduced to a bare flag.
      */
@@ -1476,13 +1529,13 @@
       el('loadingState').style.display = view === 'loading' ? 'flex' : 'none';
       el('emptyState').style.display = view === 'empty' ? 'flex' : 'none';
       el('offlineState').style.display = view === 'offline' ? 'flex' : 'none';
-      // 'board' shows exactly ONE of the two rotation screens.
+      // 'board' shows exactly ONE of the two selectable pages.
       el('todayZone').style.display = (view === 'board' && state.screen === 'cards') ? 'flex' : 'none';
       el('listsZone').style.display = (view === 'board' && state.screen === 'lists') ? 'flex' : 'none';
     }
 
     function renderTodayCards() {
-      // Already rendered for this data version — the rotation swap only needs
+      // Already rendered for this data version — the page switch only needs
       // the display toggle (fitted --tz values persist in the DOM).
       if (state.todayRenderedVersion === state.renderVersion) return;
       state.todayRenderedVersion = state.renderVersion;
@@ -1493,6 +1546,12 @@
 
       if (dogs.length === 0) {
         grid.style.display = 'none';
+        // With arrivals in the system this page is normally pinned away by
+        // renderBoard; if a manual press lands here anyway, say where the
+        // information went instead of showing a dead end.
+        emptyMsg.textContent = state.tomorrowDogs.length > 0
+          ? 'No dogs boarding today — arrivals & feed prep are on the TOMORROW & PREP LIST page'
+          : 'No dogs boarding today';
         emptyMsg.style.display = 'flex';
         return;
       }
@@ -1589,10 +1648,11 @@
      * Busy cards (medication + allergy + several quantity rows + notes) can
      * exceed the fixed card height. Rather than clipping text mid-line, shed
      * the lowest-priority content until the card fits, in order: clamp the
-     * notes to one line; drop the notes; drop the meals/food-tags row; drop
-     * extra quantity rows from the bottom up (the first always stays); and
-     * finally clamp the medication details to one line. The medication chip,
-     * allergy chip and primary quantity row are never removed.
+     * notes to one line; drop the notes; drop the supplements subcard; drop
+     * the meals/food-tags row; drop extra quantity rows from the bottom up
+     * (the first always stays); and finally clamp the medication details.
+     * The medication chip, allergy chip and primary quantity row are never
+     * removed — and medication (prescription) always outlives supplements.
      */
     function trimOverflowingCards(grid) {
       var bodies = grid.querySelectorAll('.tcard-body');
@@ -1607,7 +1667,7 @@
           if (fits()) continue;
         }
 
-        var victims = ['.notes-block', '.meta-row'];
+        var victims = ['.notes-block', '.supp-block', '.meta-row'];
         var done = false;
         for (var j = 0; j < victims.length; j++) {
           var victim = body.querySelector(victims[j]);
@@ -1726,7 +1786,14 @@
       var errorEl = el('errorBanner');
       var feedingWarnEl = el('feedingWarning');
 
-      state.dayStamp = dateStamp(nowDate());
+      // Day-change detection lives HERE (not only in masterTick) so it works
+      // even during a no-data outage: yesterday's manual page choice is stale
+      // the moment the date flips, data or no data.
+      var todayStamp = dateStamp(nowDate());
+      if (state.dayStamp && state.dayStamp !== todayStamp) {
+        state.userSelected = false;
+      }
+      state.dayStamp = todayStamp;
 
       if (!data) {
         // Nothing to show at all — keep a styled message up, never a blank screen.
@@ -1780,12 +1847,16 @@
           setMainView('empty');
         }
       } else {
-        // Default page until a remote press chooses one: TODAY normally; the
-        // lists page when only arrivals exist (a bare "No dogs boarding
-        // today" shell helps nobody). An explicit remote choice is sticky —
-        // renders never override it (midnight resets it, see masterTick).
-        if (!state.userSelected) {
-          state.screen = (zones.today.length === 0 && zones.tomorrow.length > 0) ? 'lists' : 'cards';
+        // Page choice per render. With NO today dogs the lists page is PINNED
+        // on every render — the cards page is a bare shell and the arrivals'
+        // med detail lives ONLY on the lists page, so safety overrides even a
+        // sticky manual TODAY choice (a manual press still shows cards until
+        // the next render, where the enriched empty message points the way).
+        // Otherwise an explicit remote choice is sticky; without one, TODAY.
+        if (zones.today.length === 0) {
+          state.screen = 'lists';
+        } else if (!state.userSelected) {
+          state.screen = 'cards';
         }
         renderActiveScreen();
       }
@@ -1850,36 +1921,45 @@
     }
 
     /**
-     * Selects a page ('cards' | 'lists'). fromUser=true marks the choice
-     * sticky (renders stop applying defaults until midnight resets it).
-     * Re-renders only while the board view is actually up — with zero dogs
-     * the empty/offline state stays; the choice still sticks for later.
+     * Selects a page ('cards' | 'lists') from a remote press. Only a press
+     * that actually CHANGES the page marks the choice sticky — a visibly
+     * no-op press must not silently disable the default/pin logic hours
+     * later. Re-renders only while the board view is actually up — with
+     * zero dogs the empty/offline state stays; the choice still sticks.
      */
-    function selectScreen(which, fromUser) {
-      if (fromUser) state.userSelected = true;
+    function selectScreen(which) {
       var changed = state.screen !== which;
-      state.screen = which;
-      if (changed && (state.todayDogs.length > 0 || state.tomorrowDogs.length > 0)) {
-        renderActiveScreen();
+      if (changed) {
+        state.userSelected = true;
+        state.screen = which;
+        if (state.todayDogs.length > 0 || state.tomorrowDogs.length > 0) {
+          renderActiveScreen();
+        }
       }
       updatePillSelection();
     }
 
     /**
-     * Remote arrows work from anywhere on the page (some TV browsers pass
-     * raw key events instead of doing spatial navigation): ◄ = TODAY,
-     * ► = TOMORROW & PREP LIST — deterministic (matches the pills' on-screen
-     * order), so an arrow press lands the same page whether or not the
-     * browser also moved focus. OK/Enter on a focused pill fires its native
-     * click. Checks e.key AND e.keyCode: old TV WebKits only set keyCode.
+     * Remote keys work from anywhere on the page (some TV browsers pass raw
+     * key events instead of doing spatial navigation): ◄ = TODAY,
+     * ► = TOMORROW & PREP LIST (deterministic — matches the pills' on-screen
+     * order), and OK/Enter TOGGLES the page. The toggle is what makes OK
+     * honest on spatial-nav browsers: focus always sits on the SELECTED pill
+     * (updatePillSelection), so OK's native button activation alone could
+     * only ever re-press the current page; preventDefault suppresses that
+     * redundant native click. Cursor-mode remotes still change pages via
+     * real click events on the pills, which this handler never sees.
+     * Checks e.key AND e.keyCode: old TV WebKits only set keyCode.
      */
     function handleRemoteKey(e) {
       var key = e.key || '';
       var code = e.keyCode || 0;
       if (key === 'ArrowLeft' || code === 37) {
-        selectScreen('cards', true);
+        selectScreen('cards');
       } else if (key === 'ArrowRight' || code === 39) {
-        selectScreen('lists', true);
+        selectScreen('lists');
+      } else if (key === 'Enter' || code === 13) {
+        selectScreen(state.screen === 'cards' ? 'lists' : 'cards');
       } else {
         return;
       }
@@ -1983,8 +2063,8 @@
 
     // ============================================================
     // MASTER TICK — the only interval on the page, created once.
-    // Drives the clock, countdown, page cycling, midnight rollover
-    // and scheduled refreshes.
+    // Drives the clock, countdown, midnight rollover and scheduled
+    // refreshes. Page changes are remote-driven only (no rotation).
     // ============================================================
     function masterTick() {
       var now = nowDate();
@@ -1999,11 +2079,11 @@
         el('countdown').textContent = formatCountdown(state.nextRefreshTime - now.getTime());
       }
 
-      // Midnight rollover: re-classify today/tomorrow without a reload. The
-      // manual page choice resets too — yesterday's "TOMORROW & PREP LIST"
-      // page is about today now, so the default logic picks the page afresh.
-      if (state.dayStamp && dateStamp(now) !== state.dayStamp && state.lastGoodData) {
-        state.userSelected = false;
+      // Midnight rollover: re-classify today/tomorrow without a reload.
+      // renderBoard itself notices the day change and resets the manual page
+      // choice — deliberately NOT gated on lastGoodData, so the reset happens
+      // even mid-outage (without data renderBoard just refreshes the status).
+      if (state.dayStamp && dateStamp(now) !== state.dayStamp) {
         renderBoard();
       }
 
@@ -2051,8 +2131,8 @@
       // Page-select inputs: pill clicks (cursor-mode remotes, and focus+OK —
       // OK on a focused <button> fires its native click) plus raw arrow keys
       // for browsers that pass key events straight through.
-      el('todayPillBtn').addEventListener('click', function() { selectScreen('cards', true); });
-      el('tomorrowPillBtn').addEventListener('click', function() { selectScreen('lists', true); });
+      el('todayPillBtn').addEventListener('click', function() { selectScreen('cards'); });
+      el('tomorrowPillBtn').addEventListener('click', function() { selectScreen('lists'); });
       document.addEventListener('keydown', handleRemoteKey);
       updatePillSelection();
       // Restore the last good payload so the board is never blank on
