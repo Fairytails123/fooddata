@@ -10,6 +10,14 @@ Deployed to GitHub Pages 2026-07-26: commits `424a336` (docs) + `40612c4` (board
 - Verified: 19 headless-Chrome scenarios green (supplements on sparse/dense/worst-case cards, supplements-only dog shows no red chip, OK-toggle, arrow toggle, no-rotation hold, arrivals-only pin); live API re-verified 200 after the backend redeploy.
 - **Owner-confirmed live on the TV same night** ("it all works"): the first real supplement records render the green subcard with no red chip. A token-gated `mode=clearfeedingcache` admin hook was added to the backend so freshly ticked/edited submissions can be pulled onto the board immediately for testing (drops the two feeding caches only — zero Acuity quota cost).
 
+### Final review round (closed out late night — frontend `6b328c1`, backend deployment @28, all 12 findings fixed)
+
+- **Arriving dogs' supplements now show on the ARRIVING TOMORROW list** as a green detail line — arrivals have no card, so that list is their only surface; without this the supplement was invisible exactly when feeds are prepped in advance.
+- **Sticky/pin interaction closed:** the zero-today lists pin clears the sticky flag it overrides (a stale morning press can no longer park the board on the lists page after dogs check in); remote presses are ignored while the board has zero dogs; only a page-changing press is sticky; the day is stamped at boot so even a press during a cache-less pre-midnight boot resets next day.
+- **OK/Enter hardened:** `e.repeat` + 450 ms debounce (held or stuck OK cannot strobe pages) and pill clicks inside the window are dropped (TV shells sending both a keydown and a synthesized click per OK press cannot un-toggle).
+- **Backend:** shared `parseCheckboxAnswer_` for foodTypes + supplements handles object-shaped JotForm answers and logs unrecognised shapes instead of silently dropping them.
+- Docs synced (file-header remote contract, clasp-only backend testing, 19-scenario harness description). All 19 scenarios green, including new arrivals-supplements and repeat/double-fire assertions.
+
 ## Same-day revision (evening): manual page selection replaces auto-rotation
 
 - **Auto-rotation removed entirely** (owner request): the board stays on the chosen page until the other button is pressed.
