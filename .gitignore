@@ -4,3 +4,7 @@ live_api_sample.json
 # Backend source — local-only MIRROR OF THE LIVE Apps Script (contains Acuity/JotForm
 # API keys; this repo is PUBLIC + Pages-served). Deploys go via clasp, never via this repo.
 supersetplanner&feed.gs
+
+.task/
+
+.gate-evidence/
