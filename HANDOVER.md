@@ -55,9 +55,10 @@ project is the source of truth — and it serves a second production consumer.**
 
 ## 4. How changes are verified
 
-The 19-scenario headless-Chrome harness (`build_and_run.ps1`) stamps fetch-stubbed copies
-of `index.html` and asserts JS errors, overflow, the no-truncation metric, alphabetical
-order, supplements blocks and per-card scale. **Run it after every frontend change.**
+The **20-scenario** headless-Chrome harness (`tests\build_and_run.ps1`) stamps fetch-stubbed
+copies of `index.html` and asserts JS errors, overflow, the no-truncation metric,
+alphabetical order, supplements blocks and per-card scale. **Run it after every frontend
+change.** It exits non-zero on any failure (exit code = failure count).
 
 - Canonical location: `tests\build_and_run.ps1`. Run it from the repository root; its
   generated pages, browser profiles, DOM dumps and screenshots use the system scratch

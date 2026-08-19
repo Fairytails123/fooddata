@@ -1,3 +1,33 @@
+# Changelog — Test harness committed + synthetic fixture, 20 Aug 2026
+
+**No frontend or backend behaviour changed** — `index.html` and the `.gs` are byte-identical.
+This is Phase 0 of the feeding-platform integration (see `..\Feeding manager_Telegram\INTEGRATION.md`).
+
+The headless-Chrome verification harness — the only automated check this safety display has —
+lived only in `%TEMP%\ftboard-tests\` with hardcoded user paths, so it died with the machine and
+existed on one desktop. It is now committed at **`tests\build_and_run.ps1`**, path-independent
+(repo root from `$PSCommandPath`, scratch from `$env:TEMP`, Chrome probed with a loud failure if
+absent), with a `-Validate` mode, and it **exits non-zero on failure** (exit code = failure count)
+instead of printing JSON a human had to read.
+
+Its `live` scenario replayed `live_api_sample.json` — **real customer names and medication** — so
+it could never be committed to this PUBLIC repo. That scenario is now **`fixture`**, replaying the
+committed **`tests\fixtures\api_sample.synthetic.json`**: 18 fabricated dogs whose dates are
+**rebased around the run date** at load, so the fixture cannot rot. The old `photo` scenario also
+carried live customer data as literals; it was sanitised (values invented, string lengths kept) and
+the derived `%TEMP%` artefacts of the `live` scenario were deleted.
+
+New alongside it: **`tests\assert_results.ps1`** (generic invariants + an operator-owned oracle of
+the 2026-08-19 green baseline, machine-dependent fields never asserted) and **`tests\README.md`**
+(coverage, scratch layout, and the manual screenshot checklist).
+
+Verified: 128 acceptance checks / 0 failures against real Chrome; deterministic gate PASS incl.
+gitleaks (2.77 MB, no leaks); independent blind review APPROVE with 0 blocking findings.
+Run it with `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\build_and_run.ps1`.
+Rollback: `git revert` the merge commit — nothing deployed changes either way.
+
+---
+
 # Changelog — Backend credential extraction, 10 Aug 2026
 
 Backend (FT Boarding API script) deployed @32 on the existing `/exec` deployment: the Acuity +
