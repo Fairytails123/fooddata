@@ -268,12 +268,14 @@ setTimeout(__inspect, INSPECT_DELAY);
 $scenarios = @(
   @{ name = 'fixture'; budget = 16000; delay = 10000; shot = $true; pre = @'
 <script>
+// Return the date-rebased synthetic fixture through the successful fetch stub.
 var __fixtureData = FIXTURE_JSON;
 __okFetch(__fixtureData);
 </script>
 '@ },
   @{ name = 'two'; budget = 8500; delay = 5500; shot = $true; pre = @'
 <script>
+// Two dogs are in house and one is arriving, with mixed feeding details.
 __okFetch(__payload([
   __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast', notes: 'Slow feeder bowl please', wet: '1 sachet am', supps: ['Probiotic Powder/Tab'] }),
   __dog('Maximus Aurelius', 'Featherstonehaugh', 0, 3, { notes: 'Allergic to chicken - strictly no poultry treats', types: ['Kibble', 'Wet Food - Tin'], tin: 'Half tin pm', type: 'school', supps: ['Hemp Oil', 'Calming Tabs'] }),
@@ -306,6 +308,8 @@ __okFetch(__payload([
 '@ },
   @{ name = 'eighteen'; budget = 16000; delay = 10000; shot = $true; pre = @'
 <script>
+// 18 in house plus 6 arriving must render as one alphabetical g18 page,
+// with no paging indicator or truncated content.
 var dogs = [];
 var names = ['Alfie','Bonnie','Charlie','Daisy','Eddie','Florence','Gus','Hattie','Ivy','Jasper','Kiki','Loki','Mabel','Nellie','Otis','Peggy','Quinn','Rex'];
 for (var i = 0; i < 18; i++) {
@@ -320,6 +324,8 @@ __okFetch(__payload(dogs));
 '@ },
   @{ name = 'twenty'; budget = 16000; delay = 10000; shot = $true; pre = @'
 <script>
+// The design ceiling is 20 shuffled, mixed-heavy in-house dogs plus 4 arriving.
+// They must render as one alphabetical g20 page with no truncation.
 var dogs = [];
 var names = ['Ziggy','Alfie','Milo','Bella','Rex','Coco','Nala','Daisy','Otis','Ivy','Hattie','Gus','Peggy','Jasper','Kiki','Loki','Quinn','Mabel','Teddy','Sage'];
 for (var i = 0; i < 20; i++) {
@@ -339,6 +345,8 @@ __okFetch(__payload(dogs));
 '@ },
   @{ name = 'lists'; budget = 10000; delay = 7000; shot = $true; pre = @'
 <script>
+// Clicking the lists pill must show the alphabetical prep checklist and
+// tomorrow arrivals, including medicine flags, details and checkbox bullets.
 var dogs = [];
 var names = ['Ziggy','Alfie','Milo','Bella','Rex','Coco','Nala','Daisy','Otis','Ivy','Hattie','Gus','Peggy','Jasper','Kiki','Loki','Quinn','Mabel','Teddy','Sage'];
 for (var i = 0; i < 20; i++) {
@@ -361,6 +369,8 @@ setTimeout(function() { document.getElementById('tomorrowPillBtn').click(); }, 5
 '@ },
   @{ name = 'select_back'; budget = 10000; delay = 8000; shot = $false; pre = @'
 <script>
+// ArrowRight selects lists, then ArrowLeft returns to cards after the lists
+// page has rendered and populated its prep items.
 __okFetch(__payload([
   __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast' }),
   __dog('Milo', 'Reed', -1, 3, {}),
@@ -379,6 +389,8 @@ setTimeout(function() { document.dispatchEvent(new KeyboardEvent('keydown', { ke
 '@ },
   @{ name = 'ok_toggle'; budget = 10000; delay = 7000; shot = $false; pre = @'
 <script>
+// Enter must toggle to lists, while rapid repeat and synthesised click events
+// are ignored so spatial-navigation remotes do not toggle straight back.
 __okFetch(__payload([
   __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast', supps: ['Hemp Oil'] }),
   __dog('Milo', 'Reed', -1, 3, {}),
@@ -394,6 +406,8 @@ setTimeout(function() { document.getElementById('todayPillBtn').click(); }, 5240
 '@ },
   @{ name = 'no_rotate'; budget = 75000; delay = 70000; shot = $false; pre = @'
 <script>
+// With no input for 70 virtual seconds, the board must remain on TODAY cards;
+// the old build rotated away after 45 seconds.
 __okFetch(__payload([
   __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast' }),
   __dog('Milo', 'Reed', -1, 3, {}),
@@ -404,6 +418,7 @@ __okFetch(__payload([
 '@ },
   @{ name = 'empty'; budget = 8500; delay = 5500; shot = $true; pre = @'
 <script>
+// No dog is in house today or arriving tomorrow, so show the empty state.
 __okFetch(__payload([
   __dog('Future', 'Dog', 3, 6, {}),
   __dog('Gone', 'Dog', -5, -1, {}),
@@ -413,6 +428,8 @@ __okFetch(__payload([
 '@ },
   @{ name = 'arrivals_only'; budget = 8500; delay = 5500; shot = $true; pre = @'
 <script>
+// With no dogs today and three arriving, pin the lists screen immediately,
+// show arrival medicine details and show the empty prep-panel message.
 __okFetch(__payload([
   __dog('Rex', 'Ward', 1, 4, { med: true, medDetails: 'Apoquel 16mg with breakfast ONLY' }),
   __dog('Bella', 'Nash', 1, 3, { supps: ['Hemp Oil', 'Calming Tabs'] }),
@@ -422,11 +439,13 @@ __okFetch(__payload([
 '@ },
   @{ name = 'fail_nocache'; budget = 8500; delay = 5500; shot = $false; pre = @'
 <script>
+// A failed fetch with no cached data exercises the offline error state.
 __failFetch();
 </script>
 '@ },
   @{ name = 'fail_cache'; budget = 8500; delay = 5500; shot = $true; pre = @'
 <script>
+// A failed fetch with a six-hour-old cache must show the stale cached board.
 (function() {
   var cached = __payload([
     __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast' }),
@@ -440,6 +459,7 @@ __failFetch();
 '@ },
   @{ name = 'backend_stale'; budget = 8500; delay = 5500; shot = $false; pre = @'
 <script>
+// A successful payload carrying upstream warnings exercises backend staleness.
 __okFetch(__payload([
   __dog('Bella', 'Smith', -2, 2, {})
 ], 'Showing last known data - upstream error: Bandwidth quota exceeded', 'Could not fetch feeding data from JotForm: timeout'));
@@ -447,6 +467,7 @@ __okFetch(__payload([
 '@ },
   @{ name = 'overlap'; budget = 8500; delay = 5500; shot = $false; pre = @'
 <script>
+// Two records for the same dog meet at tomorrow's stay boundary.
 __okFetch(__payload([
   __dog('Rolo', 'Barnwell', -2, 1, { med: true, medDetails: 'Eye drops twice daily' }),
   __dog('Rolo', 'Barnwell', 1, 4, {})
@@ -455,6 +476,7 @@ __okFetch(__payload([
 '@ },
   @{ name = 'xss'; budget = 8500; delay = 5500; shot = $false; pre = @'
 <script>
+// Markup-like dog and feeding values must remain text and must not execute.
 __okFetch(__payload([
   __dog('<img src=x onerror="window.__errors.push(0)">', '<b>Bad</b>', -1, 2, { notes: '<script>window.__errors.push(1)<\/script> allergic', types: ['<i>Weird Food</i>'], kibble: '<u>2 cups</u>' })
 ]));
@@ -462,6 +484,7 @@ __okFetch(__payload([
 '@ },
   @{ name = 'bad_payload'; budget = 8500; delay = 5500; shot = $false; pre = @'
 <script>
+// An error-shaped response with valid cached data exercises cache fallback.
 (function() {
   var cached = __payload([
     __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast' }),
@@ -474,6 +497,7 @@ __okFetch({ error: 'Forbidden: invalid or missing token' });
 '@ },
   @{ name = 'hang_cache'; budget = 115000; delay = 100000; shot = $false; pre = @'
 <script>
+// A fetch that never settles must time out and fall back to cached data.
 (function() {
   var cached = __payload([
     __dog('Bella', 'Smith', -2, 2, { med: true, medDetails: 'Apoquel 16mg with breakfast' })
@@ -485,6 +509,8 @@ window.fetch = function() { return new Promise(function() {}); };
 '@ },
   @{ name = 'worst_case'; budget = 8000; delay = 4000; shot = $true; pre = @'
 <script>
+// Ten heavy cards with long medicine, allergy and food details must fit on
+// one g10 page, shrinking per card until all content shows without truncation.
 var dogs = [];
 var names = ['Alfie','Bonnie','Charlie','Daisy','Eddie','Florence','Gus','Hattie','Ivy','Jasper'];
 for (var i = 0; i < 10; i++) {
@@ -502,6 +528,7 @@ __okFetch(__payload(dogs, 'Showing last known data - upstream error: Acuity thro
 '@ },
   @{ name = 'midnight'; budget = 22000; delay = 16000; shot = $false; pre = @'
 <script>
+// Crossing midnight must refresh today and tomorrow membership by date.
 __okFetch(__payload([
   __dog('TodayOnly', 'Dog', -2, 1, {}),
   __dog('ArrivesTomorrow', 'Dog', 1, 3, {}),
@@ -526,8 +553,16 @@ foreach ($scenario in $scenarios) {
   if ($scenario.post) { $post = $scenario.post }
   $post += $inspector.Replace('INSPECT_DELAY', [string]$scenario.delay)
 
-  $doc = $html.Replace('  <script>', "$pre`n  <script>")
-  $doc = $doc.Replace('</body>', "$post`n</body>")
+  $preMarker = '  <script>'
+  $postMarker = '</body>'
+  foreach ($marker in @($preMarker, $postMarker)) {
+    $markerCount = ([regex]::Matches($html, [regex]::Escape($marker))).Count
+    if ($markerCount -ne 1) {
+      throw "Expected exactly one '$marker' marker in index.html; found $markerCount."
+    }
+  }
+  $doc = $html.Replace($preMarker, "$pre`n$preMarker")
+  $doc = $doc.Replace($postMarker, "$post`n$postMarker")
   $file = Join-Path $outDir "harness_$name.html"
   [IO.File]::WriteAllText($file, $doc, $utf8)
 

@@ -93,41 +93,52 @@ function Test-FtbResults {
         ) },
       @{ Field = 'overflows'; OracleField = 'overflows'; Passed = (
           (Test-FtbHasProperty $actual 'overflows') -and
+          ((Get-FtbProperty $actual 'overflows') -is [int]) -and
           ((Get-FtbProperty $actual 'overflows') -eq 0)
         ) },
       @{ Field = 'listOverflow'; OracleField = 'listOverflow'; Passed = (
           (Test-FtbHasProperty $actual 'listOverflow') -and
+          ((Get-FtbProperty $actual 'listOverflow') -is [int]) -and
           ((Get-FtbProperty $actual 'listOverflow') -eq 0)
         ) },
       @{ Field = 'trunc'; OracleField = 'truncCount'; Passed = (
           (Test-FtbHasProperty $actual 'trunc') -and
           (Test-FtbHasProperty (Get-FtbProperty $actual 'trunc') 'count') -and
+          ((Get-FtbProperty (Get-FtbProperty $actual 'trunc') 'count') -is [int]) -and
           ((Get-FtbProperty (Get-FtbProperty $actual 'trunc') 'count') -eq 0)
         ) },
       @{ Field = 'alphaCards'; OracleField = 'alphaCards'; Passed = (
           (Test-FtbHasProperty $actual 'alphaCards') -and
+          ((Get-FtbProperty $actual 'alphaCards') -is [bool]) -and
           ((Get-FtbProperty $actual 'alphaCards') -eq $true)
         ) },
       @{ Field = 'alphaPrep'; OracleField = 'alphaPrep'; Passed = (
           (Test-FtbHasProperty $actual 'alphaPrep') -and
+          ((Get-FtbProperty $actual 'alphaPrep') -is [bool]) -and
           ((Get-FtbProperty $actual 'alphaPrep') -eq $true)
         ) },
       @{ Field = 'alphaTom'; OracleField = 'alphaTom'; Passed = (
           (Test-FtbHasProperty $actual 'alphaTom') -and
+          ((Get-FtbProperty $actual 'alphaTom') -is [bool]) -and
           ((Get-FtbProperty $actual 'alphaTom') -eq $true)
         ) },
       @{ Field = 'logoOk'; OracleField = 'logoOk'; Passed = (
           (Test-FtbHasProperty $actual 'logoOk') -and
+          ((Get-FtbProperty $actual 'logoOk') -is [bool]) -and
           ((Get-FtbProperty $actual 'logoOk') -eq $true)
         ) },
       @{ Field = 'loading'; OracleField = 'loading'; Passed = (
           (Test-FtbHasProperty $actual 'loading') -and
+          ((Get-FtbProperty $actual 'loading') -is [bool]) -and
           ((Get-FtbProperty $actual 'loading') -eq $false)
         ) }
     )
 
     foreach ($check in $genericChecks) {
+      $oracleFieldExcluded = $machineFields.ContainsKey($check.OracleField) -or
+        $check.OracleField -match '(?i)(date|checkin|checkout|lastupdated)'
       $carriedByOracle = ($null -ne $expected) -and
+        (-not $oracleFieldExcluded) -and
         (Test-FtbHasProperty $expected $check.OracleField)
       if ((-not $carriedByOracle) -and (-not $check.Passed)) {
         $failures++
