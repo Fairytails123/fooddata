@@ -65,7 +65,8 @@ function report(name, ok, detail) {
 function skip(name, why) {
   console.log(`SKIP  ${name}  -- ${why} (NOT a pass; operator must run without the skip)`);
 }
-function readText(p) { try { return readFileSync(p, 'utf8'); } catch { return null; } }
+// Strip a UTF-8 BOM: PowerShell 5.1 writes one and JSON.parse rejects it.
+function readText(p) { try { return readFileSync(p, 'utf8').replace(/^﻿/, ''); } catch { return null; } }
 function git(args) {
   const r = spawnSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8' });
   return r.status === 0 ? r.stdout : null;
@@ -312,7 +313,9 @@ let fx = null;
     try { oracle = JSON.parse(oracleRaw); } catch { }
     report('full: oracle fixture parses', oracle !== null);
 
-    const preStatus = git(['status', '--porcelain']) || 'PRE-FAIL';
+    // NB: a clean tree yields "", which is falsy — never use || fallbacks here or the
+    // comparison can only pass on a DIRTY tree (found by the first full run).
+    const preStatus = git(['status', '--porcelain']);
     const runStart = Date.now();
     // R2-6: full run from a FOREIGN cwd with a controlled scratch root, so hardcoded
     // repo/TEMP assumptions cannot hide behind the operator's normal environment.
@@ -414,8 +417,10 @@ let fx = null;
     }
     report('full: screenshots fresh, non-trivial, real PNGs for all shot scenarios', shotBad === null, shotBad || '');
 
-    const postStatus = git(['status', '--porcelain']) || 'POST-FAIL';
-    report('full: repo tree untouched by the run', preStatus === postStatus);
+    const postStatus = git(['status', '--porcelain']);
+    report('full: repo tree untouched by the run',
+      preStatus !== null && postStatus !== null && preStatus === postStatus,
+      `pre=${JSON.stringify(preStatus)} post=${JSON.stringify(postStatus)}`);
   }
 }
 
