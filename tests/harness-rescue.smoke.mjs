@@ -3,9 +3,11 @@
 // Authored BEFORE implementation (tests-first) and revised per the Codex
 // pre-flight critique of 2026-08-19 (operator-owned oracles, no tautologies).
 //
-// Env: FTBOARD_SKIP_SPAWN=1 skips every test that spawns a child process (the
-// Codex sandbox denies nested spawns). Skips are LOUD and are never a pass;
-// the operator runs the full suite outside the sandbox before the gate counts.
+// Env: FTBOARD_SKIP_SPAWN=1 skips the tests that spawn PowerShell/Chrome (the
+// Codex sandbox denies those nested spawns; plain git subprocesses ARE allowed
+// there, so git-based checks always run and a git failure is an honest failure,
+// never a skip). Skips are LOUD and are never a pass; the operator runs the
+// full suite outside the sandbox before the gate counts.
 //
 // This file and the three fixtures it owns (expected_scenarios.json,
 // selftest_good.json, selftest_bad.json) are OPERATOR-owned: the contract
@@ -80,7 +82,18 @@ function trackedFiles() {
   const out = git(['ls-files']);
   return out === null ? null : out.split(/\r?\n/).filter(Boolean);
 }
-const isoDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+const isoDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) &&
+  new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
+const FIXTURE_D0 = '2026-01-05'; // deliberately old (R2-7): an unrebased run cannot pass
+const addDays = (s, n) => new Date(Date.parse(s + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+const PHOTO_MARKERS = ['Axo', 'Bolt', 'Glimmer', 'Luna', 'Momo', 'Misty', 'Tock'];
+const INSPECT_KEYS = ['errors', 'screen', 'selPill', 'focusedPill', 'todayCount',
+  'tomorrowCount', 'tcards', 'prepItems', 'tomItems', 'namePx', 'qtyPx', 'notesPx',
+  'medPx', 'listPx', 'alphaCards', 'alphaPrep', 'alphaTom', 'todayInd', 'loading',
+  'empty', 'offline', 'board', 'statusText', 'stale', 'errBanner', 'warnBanner',
+  'medChips', 'allergyChips', 'suppBlocks', 'suppText', 'medFlags', 'listDetails',
+  'suppDetails', 'clipWarns', 'noMatch', 'gridClass', 'tzs', 'overflows',
+  'listOverflow', 'trunc', 'cacheHasDogs', 'clock', 'countdown', 'logoOk', 'xssText'];
 const keySetOk = (obj, allowed, required) => {
   const keys = Object.keys(obj);
   return keys.every(k => allowed.includes(k)) && required.every(k => keys.includes(k));
@@ -206,6 +219,28 @@ let fx = null;
       ['exact', 'fullname', 'fuzzy', 'none'].every(m => mts.has(m)));
     const firsts = dogs.map(d => d.dogName.split(' ')[0].toLowerCase());
     report('fixture-mix: >=2 dogs share a first name', firsts.some((n, i) => firsts.indexOf(n) !== i));
+
+    // Round-2 adoptions: fixed old D0, distribution, end date, ambiguous pairing,
+    // sentence-length allergy note.
+    if (fx.dateRange) {
+      report('fixture-dates: dateRange.start is the fixed old D0 2026-01-05', fx.dateRange.start === FIXTURE_D0);
+      report('fixture-dates: dateRange.end is D0+6', fx.dateRange.end === addDays(FIXTURE_D0, 6));
+      const d0 = fx.dateRange.start;
+      const staying = dogs.filter(d => d.checkIn <= d0 && d.checkOut > d0);
+      const arriving = dogs.filter(d => d.checkIn === addDays(d0, 1));
+      const departed = dogs.filter(d => d.checkOut <= d0);
+      report('fixture-dates: staying 10-14, arriving 2-3, departed 1-2, all classified',
+        staying.length >= 10 && staying.length <= 14 &&
+        arriving.length >= 2 && arriving.length <= 3 &&
+        departed.length >= 1 && departed.length <= 2 &&
+        staying.length + arriving.length + departed.length === dogs.length,
+        `s=${staying.length} a=${arriving.length} d=${departed.length}`);
+    }
+    const amb = dogs.find(d => d.ambiguousMatch === true);
+    report('fixture-mix: the ambiguous dog shares its first name with another dog',
+      !!amb && firsts.filter(n => n === amb.dogName.split(' ')[0].toLowerCase()).length >= 2);
+    report('fixture-mix: allergy note is a real sentence (length >= 25, contains spaces)',
+      feds.some(f => /allerg/i.test(f.specialNotes) && f.specialNotes.length >= 25 && f.specialNotes.includes(' ')));
   }
 }
 
@@ -229,6 +264,9 @@ let fx = null;
     /api_sample\.synthetic\.json/.test(t) && /['"]fixture['"]/.test(t));
   report('no-pii: no scenario named live remains',
     t !== '' && !/name\s*=\s*'live'/.test(t) && !/name\s*=\s*"live"/.test(t));
+  report('no-pii: harness carries the SANITISED photo scenario (all 7 fabricated marker names)',
+    t !== '' && PHOTO_MARKERS.every(n => t.includes(`'${n}'`)),
+    PHOTO_MARKERS.filter(n => !t.includes(`'${n}'`)).join(','));
 }
 
 // ---------------------------------------------------------------- protected behaviour
@@ -248,6 +286,16 @@ let fx = null;
   }
   report('protected: live_api_sample.json still gitignored', gitOk(['check-ignore', '-q', 'live_api_sample.json']));
   report('protected: supersetplanner&feed.gs still gitignored', gitOk(['check-ignore', '-q', 'supersetplanner&feed.gs']));
+  // R2-13: the ignore checks alone are tautological when the files are absent.
+  // If either ignored file EXISTS here it must be untracked (never staged/committed).
+  const tfNow = trackedFiles() || [];
+  for (const f of ['live_api_sample.json', 'supersetplanner&feed.gs']) {
+    if (existsSync(join(repoRoot, f))) {
+      report(`protected: ${f} present but untracked`, !tfNow.includes(f));
+    } else {
+      report(`protected: ${f} absent from this tree (untracked-by-construction)`, true);
+    }
+  }
 }
 
 // ---------------------------------------------------------------- test 4
@@ -266,7 +314,11 @@ let fx = null;
 
     const preStatus = git(['status', '--porcelain']) || 'PRE-FAIL';
     const runStart = Date.now();
-    const run = ps(['-File', harnessPath], { cwd: repoRoot });
+    // R2-6: full run from a FOREIGN cwd with a controlled scratch root, so hardcoded
+    // repo/TEMP assumptions cannot hide behind the operator's normal environment.
+    const scratchBase = mkdtempSync(join(tmpdir(), 'ftb-run-'));
+    const run = ps(['-File', harnessPath],
+      { cwd: tmpdir(), env: { ...process.env, TEMP: scratchBase, TMP: scratchBase } });
     const out = (run.stdout || '');
     report('full: 20-scenario run exits 0', run.status === 0,
       `exit=${run.status}; tail: ${(out + (run.stderr || '')).slice(-300).replace(/\s+/g, ' ')}`);
@@ -279,6 +331,27 @@ let fx = null;
       JSON.stringify(got) === JSON.stringify([...MANIFEST].sort()),
       `got ${got.join(',') || 'none'}`);
 
+    const scratch = join(scratchBase, 'ftboard-tests');
+    // R2-5: the stamped page copies must exist, be fresh, and contain a real page
+    // marker — output JSON alone could be forged by a hollow harness.
+    {
+      let stampBad = null;
+      for (const n of MANIFEST) {
+        const p = join(scratch, `harness_${n}.html`);
+        if (!existsSync(p)) { stampBad = n + ' missing'; break; }
+        if (statSync(p).mtimeMs < runStart) { stampBad = n + ' stale'; break; }
+        if (!(readText(p) || '').includes('todayPillBtn')) { stampBad = n + ' lacks page marker'; break; }
+      }
+      report('full: fresh stamped page copy with real page marker for all 20 scenarios',
+        stampBad === null, stampBad || '');
+    }
+    // R2-14: every scenario's inspection JSON must retain the full key set.
+    for (const n of MANIFEST) {
+      const j = blocks[n];
+      if (!j) continue; // parse failure already reported by invariants below
+      const missing = INSPECT_KEYS.filter(k => !(k in j));
+      report(`full: ${n} inspection JSON carries all expected keys`, missing.length === 0, missing.join(','));
+    }
     const invariants = (n, j) => {
       if (!j) { report(`full: ${n} inspection JSON parses`, false); return; }
       const inv = Array.isArray(j.errors) && j.errors.length === 0 && j.overflows === 0 &&
@@ -319,6 +392,7 @@ let fx = null;
         if (j.noMatch !== staying.filter(d => !d.matched).length) bad.push('noMatch=' + j.noMatch);
         if (j.medChips !== staying.filter(d => d.feeding && d.feeding.medication === 'Yes').length) bad.push('medChips=' + j.medChips);
         if (expFirst && !(typeof j.xssText === 'string' && j.xssText.startsWith(expFirst))) bad.push(`firstCard=${j.xssText}`);
+        if (j.stale !== false) bad.push('stale=' + j.stale); // rebase must refresh lastUpdated (R2-7)
         report('full: fixture matches smoke-computed expectations (rebase rule)', bad.length === 0, bad.join(' '));
       } else {
         report('full: fixture matches smoke-computed expectations (rebase rule)', false, 'no fixture output');
@@ -327,7 +401,6 @@ let fx = null;
       report('full: fixture expectations computable', false, 'fixture unparsed');
     }
 
-    const scratch = join(process.env.TEMP || tmpdir(), 'ftboard-tests');
     let shotBad = null;
     for (const s of SHOT_SCENARIOS) {
       const p = join(scratch, `shot_${s}.png`);
@@ -335,8 +408,11 @@ let fx = null;
       const st = statSync(p);
       if (st.mtimeMs < runStart) { shotBad = s + ' stale'; break; }
       if (st.size < 10000) { shotBad = s + ' tiny'; break; }
+      const head = readFileSync(p).subarray(0, 8);
+      const magic = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+      if (!magic.every((b, i) => head[i] === b)) { shotBad = s + ' not a PNG'; break; }
     }
-    report('full: screenshots fresh + non-trivial for all shot scenarios', shotBad === null, shotBad || '');
+    report('full: screenshots fresh, non-trivial, real PNGs for all shot scenarios', shotBad === null, shotBad || '');
 
     const postStatus = git(['status', '--porcelain']) || 'POST-FAIL';
     report('full: repo tree untouched by the run', preStatus === postStatus);
@@ -352,12 +428,17 @@ let fx = null;
   } else if (!existsSync(assertPath)) {
     report(name, false, 'tests/assert_results.ps1 missing');
   } else {
-    const good = ps(['-File', assertPath, '-ResultsFile', selftestGood], { cwd: repoRoot });
-    report('checker: operator-owned GOOD sample exits 0', good.status === 0,
-      `exit=${good.status}; ${((good.stdout || '') + (good.stderr || '')).slice(-200).replace(/\s+/g, ' ')}`);
-    const bad = ps(['-File', assertPath, '-ResultsFile', selftestBad], { cwd: repoRoot });
-    report('checker: operator-owned BAD sample (2 defects) exits exactly 2', bad.status === 2,
-      `exit=${bad.status}; ${((bad.stdout || '') + (bad.stderr || '')).slice(-200).replace(/\s+/g, ' ')}`);
+    const cases = [
+      ['GOOD sample exits 0', selftestGood, 0],
+      ['BAD sample (2 oracle defects) exits exactly 2', selftestBad, 2],
+      ['GENERIC sample (oracle-less, 1 invariant defect) exits exactly 1', join(here, 'fixtures', 'selftest_generic.json'), 1],
+      ['IGNORE sample (machine-excluded fields mutated) exits 0', join(here, 'fixtures', 'selftest_ignore.json'), 0],
+    ];
+    for (const [label, file, want] of cases) {
+      const r = ps(['-File', assertPath, '-ResultsFile', file], { cwd: repoRoot });
+      report(`checker: ${label}`, r.status === want,
+        `exit=${r.status}; ${((r.stdout || '') + (r.stderr || '')).slice(-200).replace(/\s+/g, ' ')}`);
+    }
   }
 }
 
@@ -368,6 +449,8 @@ let fx = null;
   report('docs: tests/README.md exists with substance', readme !== null && readme.length > 800);
   report('docs: README covers rebase rule + screenshot checklist',
     readme !== null && /rebase/i.test(readme) && /screenshot/i.test(readme));
+  report('docs: README names the run command, exit semantics and synthetic rationale',
+    readme !== null && /build_and_run\.ps1/.test(readme) && /exit code/i.test(readme) && /synthetic/i.test(readme));
 
   const claude = readText(join(repoRoot, 'CLAUDE.md')) || '';
   const handover = readText(join(repoRoot, 'HANDOVER.md')) || '';
@@ -377,6 +460,11 @@ let fx = null;
   report('docs: CLAUDE.md no longer instructs the %TEMP% harness', !/%TEMP%\\ftboard-tests/.test(claude));
   report('docs: HANDOVER.md no longer claims %TEMP% is the location', !/%TEMP%\\ftboard-tests/.test(handover));
   report('docs: CLAUDE.md no longer references the PII capture', !new RegExp(PII_BASENAME, 'i').test(claude));
+  // R2-4/R2-11: HANDOVER may keep the PII-fate note but must not retain the
+  // "replays live_api_sample" harness instruction. CHANGELOG.md and .gitignore are
+  // contract-recorded exemptions (history / the ignore rule itself).
+  report('docs: HANDOVER.md no longer instructs replaying the PII capture',
+    !/replays[^\n]*live_api_sample/i.test(handover));
 
   for (const p of [harnessPath, assertPath]) {
     const label = basename(p);
