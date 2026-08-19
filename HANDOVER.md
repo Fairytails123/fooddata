@@ -55,15 +55,17 @@ project is the source of truth — and it serves a second production consumer.**
 
 ## 4. How changes are verified
 
-The 19-scenario headless-Chrome harness (`build_and_run.ps1`) stamps fetch-stubbed copies
-of `index.html` and asserts JS errors, overflow, the no-truncation metric, alphabetical
-order, supplements blocks and per-card scale. **Run it after every frontend change.**
+The **20-scenario** headless-Chrome harness (`tests\build_and_run.ps1`) stamps fetch-stubbed
+copies of `index.html` and asserts JS errors, overflow, the no-truncation metric,
+alphabetical order, supplements blocks and per-card scale. **Run it after every frontend
+change.** It exits non-zero on any failure (exit code = failure count).
 
-- Current location: `%TEMP%\ftboard-tests\build_and_run.ps1` (local-only). **Phase 0 of
-  the integration is moving it into this repo with a synthetic fixture** — once
-  `tests\` exists here, that copy is canonical and `%TEMP%` is retired.
-- Its `live` scenario replays `live_api_sample.json` — **real customer names +
-  medication; gitignored on purpose; must never reach the public repo or Pages.**
+- Canonical location: `tests\build_and_run.ps1`. Run it from the repository root; its
+  generated pages, browser profiles, DOM dumps and screenshots use the system scratch
+  directory and are never written into the repository.
+- The additional `fixture` scenario uses the committed synthetic data under
+  `tests\fixtures\`. The separately held `live_api_sample.json` remains local and
+  gitignored until the folder-merge endgame; it must never reach the public repo or Pages.
 - Backend: run `testFeedingBoard()` in the LIVE Apps Script editor, or hit `/exec`
   directly (`mode=feeding`, `mode=clearfeedingcache`). `inspectCheckInOutSnapshot()` is
   the read-only, zero-Acuity diagnostic.
