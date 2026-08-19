@@ -1,8 +1,9 @@
 .claude/
 # Local test asset — real customer names + medication details; never publish to Pages
 live_api_sample.json
-# Backend source — local-only MIRROR OF THE LIVE Apps Script (contains Acuity/JotForm
-# API keys; this repo is PUBLIC + Pages-served). Deploys go via clasp, never via this repo.
+# Backend source — local-only MIRROR OF THE LIVE Apps Script (secret-free since
+# 2026-08-10: creds moved to Script Properties). Stays ignored because the live script
+# is the source of truth and deploys go via clasp (Boardingplan repo CI), never via here.
 supersetplanner&feed.gs
 
 .task/

@@ -1,3 +1,17 @@
+# Changelog — Backend credential extraction, 10 Aug 2026
+
+Backend (FT Boarding API script) deployed @32 on the existing `/exec` deployment: the Acuity +
+JotForm API keys were **rotated** (old values revoked after the public-repo exposure) and the
+script now reads `ACUITY_USER_ID` / `ACUITY_API_KEY` / `JOTFORM_API_KEY` from **Script
+Properties**, lazily in `getCreds_()`. The local mirror `supersetplanner&feed.gs` is synced
+byte-exact to the deployed code and is **secret-free** (the same source is committed to the
+public `Boardingplan` repo, whose CI is green again). No frontend change; both `/exec` legs
+verified live (feeding rebuilt fresh with the new JotForm key; boarding on first cache-miss).
+Rotation runbook + the IDE property-editor trap: `gas-gotchas` skill and
+`_SECRETS\google-services.md`.
+
+---
+
 # Changelog — One-Page Board + Rotating Lists Screen, 26 July 2026
 
 Deployed to GitHub Pages 2026-07-26: commits `424a336` (docs) + `40612c4` (board), verified serving live. The TV browser needs one manual refresh after any deploy (the page never reloads itself).
