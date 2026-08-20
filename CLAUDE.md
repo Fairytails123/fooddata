@@ -1,72 +1,55 @@
-# CLAUDE.md
+# This repo is a PUBLISH TARGET — do not edit the page here
 
-<!-- n8n-vps-brief:v1 -->
-<!-- ⚠️ PUBLIC REPO: this file is served on the GitHub Pages site (pushing main IS publishing).
-     Never paste the full n8n-VPS brief — or any SSH / server / credential detail — into this
-     repo. The canonical brief auto-loads from the parent folder's CODING\CLAUDE.md. -->
-## n8n note (corrected 2026-07-26)
+**The maintained source of the TV feeding-plans page lives in the platform repo:**
 
-This project has **no n8n touchpoints**: the backend is the Google Apps Script web app (`supersetplanner&feed.gs`) calling Acuity and JotForm directly, and the frontend calls that Apps Script `/exec` URL — nothing here calls an n8n webhook. If n8n work is ever added, it targets the self-hosted VPS per the parent `CODING\CLAUDE.md` brief (migration source of truth: `CODING\Hostinger_n8n\n8n-vps-migration-handover.md` — both paths relative to the CODING folder above this repo).
+```
+..\Feeding manager_Telegram\tv-plans\index.html      ← the ONE canonical copy
+..\Feeding manager_Telegram\tests\tv-plans\          ← its 20-scenario Chrome harness
+```
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+`index.html` and `assets/` in THIS repo are the **published artefact** that GitHub Pages
+serves at https://fairytails123.github.io/fooddata/ (the TV's bookmarked URL, which never
+changes). They are generated output, not a source. Editing them here creates exactly the
+two-drifting-copies problem this split was made to end.
 
-## What this is
+## To change the TV page
 
-A TV dashboard for Fairy Tails K9 Centre that shows which boarding dogs are staying today / arriving tomorrow and their feeding requirements. Two files, no build system, no tests:
+```bash
+# in ..\Feeding manager_Telegram
+#   1. edit tv-plans/index.html
+#   2. verify — 20 scenarios, real Chrome, exit code = failure count
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\tv-plans\build_and_run.ps1
+#   3. publish (staged payload is proven byte-identical to the live page)
+bash scripts/publish_plans_tv.sh "what changed"
+```
 
-- **`index.html`** — single-file static frontend (inline CSS + vanilla ES5 JS). Designed for a Hisense 40" FHD TV (1920×1080), no-scroll, all cards fit one screen. Refreshes at fixed times (07:00 / 13:00 / 18:00 browser-local) to stay under Acuity's bandwidth quota.
-- **`supersetplanner&feed.gs`** — Google Apps Script web app (the backend "API"). Pulls boarding appointments from **Acuity Scheduling**, feeding records from **JotForm**, matches them, and returns JSON via `doGet`. **Local-only and gitignored since 2026-07-26** (this repo is public + Pages-served). **Since 2026-08-09/10 the script carries NO credentials** — the leaked keys were rotated and the script now reads them from Script Properties (lazily, in `getCreds_()`); the secret-free source is committed to the public `Boardingplan` repo, which owns CI deploys. It is a mirror of the LIVE script, which ALSO serves a `mode=checkinout` snapshot layer for the external Feeding Report Manager — **the live script is the source of truth, not this file.**
+`--dry-run` stages and prints the SHA-256 without cloning or pushing.
+⚠️ **The TV never reloads itself** — after any publish, refresh the browser on the TV once
+by hand or it keeps running the old page indefinitely.
 
-The two are deployed separately and communicate over HTTPS:
-- The `.gs` deploys via **clasp**, never by pasting and never via this repo. Script ID + web-app Deployment ID: `CODING\_SECRETS\google-services.md` ("Dog feed requirement display" row). Flow: `clasp clone-script <scriptId>` into a scratch dir, **DRIFT-CHECK the clone against the local mirror before touching anything** (2026-07-26: the live script had an entire extra check-in/out layer the old repo copy lacked — a blind push would have destroyed a production API), apply edits to the clone, `clasp push -f`, then `clasp redeploy <deploymentId>` (never a fresh `clasp deploy` — that mints a new URL). The `/exec` URL + shared `API_TOKEN` are hardcoded into `index.html` (`API_URL`, `API_TOKEN` near the top of the `<script>`). **On API-key rotation only the Script Properties values change (never via the IDE settings page — its save silently fails on this project's big property blobs; see `gas-gotchas`); rotating the shared `API_TOKEN` still means updating the live script, the mirror AND `index.html`.**
-- `index.html` deploys via **GitHub Pages from `main`** (https://fairytails123.github.io/fooddata/) — pushing `main` IS deploying, so verify before pushing. **The page never reloads itself** (the scheduled refreshes only re-fetch data), so after any frontend deploy the TV browser must be refreshed once by hand or it keeps running the old HTML indefinitely.
+## The boarding Apps Script
 
-There is no build/lint tooling in the repo. To test the backend, open the LIVE Apps Script project in the editor and run `testFeedingBoard()` there (logs via `Logger.log`) — **never paste the local mirror over the live project**; all edits and deploys go through the clasp flow above (a paste from a drifted mirror would clobber the live-only `checkinout` layer). The live `/exec` endpoint can also be exercised directly (`mode=feeding`, and `mode=clearfeedingcache` to bypass caches). For the frontend, the canonical headless-Chrome harness is `tests\build_and_run.ps1`; run it from the repository root after **every** frontend change with `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\build_and_run.ps1`. It exercises 20 fetch-stubbed scenarios, including a committed synthetic fixture, at 1920×1080 and exits non-zero when an invariant or operator-owned oracle expectation fails. See `tests\README.md` for validation mode, scenario coverage, scratch output and the manual screenshot checks.
+The **live Apps Script is the only source of truth** — it is the code that actually runs:
 
-## Data flow (request → screen)
+- Script ID `12ZBH5zualFVdVz23pmC7orrqcf6wyUA8YbXKa6kR3kxm4T4KdBubh5gM`
+- Deploy vehicle: `Fairytails123/Boardingplan` (`src/supersetplanner-feed.gs`). Its CI
+  fingerprints repo vs live HEAD vs the deployed version and **refuses to deploy when live
+  matches no committed state**, so editor-only changes are never destroyed.
+- The old local mirror in this folder was **deleted 2026-08-20** — it had no drift
+  protection and was the copy behind the 2026-07-26 near-miss. Verified byte-identical to
+  both live and Boardingplan before removal. To read the truth:
+  `clasp clone-script 12ZBH5zualFVdVz23pmC7orrqcf6wyUA8YbXKa6kR3kxm4T4KdBubh5gM`
+- To prove live still matches the deploy vehicle:
+  `BOARDING=1 bash tests/run.sh` in the platform repo.
 
-1. TV browser calls `API_URL?mode=feeding&token=...` at the three scheduled times (`SCHEDULED_REFRESH_HOURS = [7, 13, 18]`, driven by `scheduleNextRefresh()` / `computeNextRefreshTime()`).
-2. `doGet` validates the token, routes `mode=feeding` → `getFeedingBoardData()`.
-3. `getFeedingBoardData()` = `getBoardingData()` (Acuity) + `fetchJotformSubmissions_()` (JotForm) → `matchFeedingRecords_()`.
-4. Returns `{ dogs, dogCount, dateRange, lastUpdated, error, feedingError }`.
-5. Frontend `renderBoard()` runs **client-side** today/tomorrow classification + de-duplication (`classifyDogs` → `deduplicateTagged`), sorts both zones **alphabetically** (`sortDogsAlpha` — dog first name, then surname; owner rule 2026-07-26), then `renderActiveScreen()` renders whichever rotation screen is up: `renderTodayCards()` (all today dogs, one page, `fitTodayZone()` auto-sizes each card) or `renderListsScreen()` (feed-prep checklist + tomorrow arrivals; see the layout note below).
+**Never push to the live script from a local copy.** Changes go through Boardingplan's
+guarded workflow.
 
-The backend still sorts `dogs` med-first (`getFeedingBoardData`) but that is only a transport order now: the frontend re-sorts alphabetically for display. Medication visibility is no longer provided by ordering — it's provided by the **single-page, no-truncation contract** (every dog is always on screen, med text always in full) plus the red MEDS flags on the lists screen. If paging is ever reintroduced, med-first display order must come back with it.
+## Still here on purpose
 
-**Important split of responsibility:** the backend returns stays for a wider window (7 days back to 6 forward), but the frontend narrows to *today's stays + tomorrow's arrivals*. The "next 7 days" empty-state text and the date math live in the frontend. Don't assume the displayed set equals the backend's `dogs` array.
+- `CHANGELOG.md` — this repo's history, kept.
+- `live_api_sample.json` — real customer names + medication, **gitignored**, local only.
+  Stays until the folder-merge endgame; it must never reach this public repo or Pages.
+- `AGENTS.md` — standing rules.
 
-## Key concepts when editing
-
-**Dog-name matching is the trickiest logic** (`matchFeedingRecords_` in the `.gs`). Acuity stores names as `"DogFirstName OwnerSurname"`; JotForm's dog-name field is free text where owners inconsistently enter just the dog name or "Dog Surname", plus a separate (newer) surname field. Matching uses a **5-tier priority**, with most-recent submission breaking ties within a tier:
-- **1 exact** — JotForm `ownerSurname` field + dog first name both match.
-- **2 fullname** — dog field holds the full `"DogName Surname"` (or first name + trailing words = surname).
-- **3 name_only** — dog first name matches and the JotForm record has *no* surname info anywhere.
-- **4 fuzzy** (fallback) — dog first name matches and the surname is within one edit (`oneEditApart_`), absorbing owner typos like "Wighthman"/"Wightman".
-- **5 surname** (fallback) — surname field matches regardless of dog name (covers a blank/wrong dog name in Acuity); **skipped if more than one dog shares that surname**, to avoid attaching the wrong dog's food/meds.
-
-Tiers 4–5 run **only when tiers 1–3 find nothing** — they rescue otherwise-empty cards, never override a good match. The chosen tier is exposed on each dog as `matchType` (`exact | fullname | name_only | fuzzy | surname | none`). `ambiguousMatch` flags first-name-only collisions. If feeding data shows on the wrong dog, this is where to look.
-
-**JotForm field IDs are hardcoded** in `JOTFORM_FIELDS` (top of the `.gs`) and keyed to form `240635310347348`. If the form is recreated or fields reordered, these IDs break silently (records parse as null/empty). `parseFeedingRecord_` maps them to clean records.
-
-**Food types split into "has an amount" vs "amount-less", and that drives how they render.** The five `foodTypes` values: `Kibble` / `Wet Food - Sachet/Tray` / `Wet Food - Tin` each have a paired quantity field (`kibbleSummary` / `wetFood` / `tinFood`) shown as a `qty-row`; their `food-tag` chips are supplementary and are hidden in the dense `g8` layout (the qty-row already carries the detail). But `Pre-Portioned by parents` and `Special Requirements` have **no amount field** — the tag is their *only* representation, so `buildQuantityRows` renders them as their own always-visible qty-row ("Food: Pre-portioned by parents" — no quantity, since the parents pre-portion it; "Special: See notes"), and `buildFoodTags` skips them to avoid doubling. Don't "simplify" this by hiding all food-tags in g8 *or* dropping the amount-less qty-rows — either silently loses the entire feeding instruction for a dog like Lola Hall whose only feeding info is the pre-portioned type.
-
-**Prescription medication vs training supplements are SEPARATE (owner rule 2026-07-26).** JotForm field 61 `Training Supplements` (checkbox: Hemp Oil / Multivitamin Tabs / Probiotic Powder/Tab / Calming Tabs) parses to `feeding.supplements` — an array handled exactly like `foodTypes`, and **guarded everywhere for records/caches that predate the field** (stale payloads have no `supplements` key). The **red Medication chip is prescription-only**; supplements render as the green `.supp-block` subcard (label "Supplements", values joined with " · ") between the allergy chip and the qty rows. In the trim ladder supplements shed after notes and before the meta-row — medication always outlives them. Reality note: as of 2026-07-26 staff still type supplements into Medication Details on existing records ("Training dog medication hemp oil multivitamins…"); those keep showing in the red chip until each submission is edited to use the checklist — the split only takes visual effect per-record as staff adopt the new field.
-
-**Caching is layered and aggressive** (recent commits fixed Acuity bandwidth-quota errors). `CacheService` keys: `fullFeedingResponse`/`fullBoardingResponse` (**5 h**, `FULL_RESPONSE_CACHE_SECONDS`), `jotformFeedingData` (30 min, incremental via `created_at:gt`), appointment-type IDs (**6 h**, the CacheService max, `BOARDING_TYPE_CACHE_SECONDS`). Dog names are cached **permanently in `PropertiesService`** under `acuityDogNameCache` (`DOG_NAME_PROPERTY_KEY`) — an appointment ID's dog name never changes, so each appointment's detail is fetched exactly *once, ever* (this was the core fix for "Bandwidth quota exceeded"). Acuity appointment *details* (for dog names) are fetched in batches of 5 with 2 s sleeps to stay under rate limits. When debugging "stale data", account for these TTLs — changes can take up to 5 h to surface. **To force a refresh** (added 2026-07-26): `?mode=clearfeedingcache&token=…` drops `fullFeedingResponse` + `jotformFeedingData` (zero Acuity cost — boarding caches untouched); the next `mode=feeding` call, or a TV page refresh, rebuilds fresh. This is also the only fast way to pick up **edited** submissions — the incremental JotForm fetch keys on `created_at` and misses edits until cache expiry.
-
-**Stale-data fallback.** On a successful run, `getBoardingData()` / `getFeedingBoardData()` mirror their last *clean* response into `PropertiesService` (`lastGoodBoardingResponse`, `lastGoodFeedingResponse`). If Acuity later throttles, the catch blocks serve that copy with `error` set to "Showing last known data — upstream error: …" while keeping `stays`/`dogs` populated. So **`error` can be non-null while the board still renders real dogs** — don't treat a set `error` as an empty board.
-
-**Two appointment types** are merged: `BOARDING_TYPE_NAME` ('dog boarding') and `BOARDING_SCHOOL_TYPE_NAME` ('boarding school'), matched case-insensitively against Acuity type names. Each dog carries `type: 'boarding' | 'school'`, which drives card styling (purple "school" header vs blue).
-
-**Timezone coupling:** both files use `new Date()` and rely on the Apps Script project timezone and the TV browser timezone both being **Europe/London**. Mismatches cause stays to appear/disappear incorrectly around midnight (see the header comment in the `.gs`).
-
-**Card names show dog first name + owner surname** (`buildDogNameHtml` → `.name-first` / `.name-surname` spans, both escaped). Surnames disambiguate same-named dogs (two Rubys with different feeding plans) — never drop them from a card. The name block is a wrapping flex row: both parts share one line when they fit; otherwise the surname wraps to its own full-width line. Each part stays on one line (no mid-word break) — if a part would overflow, the per-card auto-fit (below) sees the clip (`scrollWidth > clientWidth` in `cardFits`) and backs `--tz` off until the whole name fits, so names are normally shown in full and unbroken. Only a single token longer than the card at the minimum scale is clipped (cleanly, no ellipsis, via `overflow:hidden`) rather than spilling over a neighbour. Today cards have **no "TODAY" badge** (the "STAYING TODAY" zone header + cyan border mark them); that was removed so the header width goes to the name. Don't reintroduce a per-card today badge or collapse the name to a single ellipsized block.
-
-**The board NEVER pages dog cards, and NEVER auto-rotates — page choice is MANUAL via the remote (owner decisions 2026-07-26, rotation removed same day).** The header count pills are real `<button>` elements and the only page controls: **TODAY** shows the cards page (every today dog on one page at full height); **TOMORROW & PREP LIST** shows two big alphabetical lists — "FEED PREP — IN TONIGHT" (all today dogs, checkbox bullets, red MEDS / amber ALLERGY / NO RECORD flags via `buildListItem`) and "ARRIVING TOMORROW" (same flags **plus full med-details / allergy sentence / supplements as `list-detail` lines — arrivals have no card on either page, so this list is the ONLY place their med and supplement text appears; never reduce it back to a bare flag**). Three remote input paths all reach `selectScreen()` (keep all three — TV browsers vary): pill click (cursor-mode remotes), raw ArrowLeft/ArrowRight anywhere (deterministic ◄=cards ►=lists matching the pills' on-screen order), and **OK/Enter anywhere, which TOGGLES the page** (`handleRemoteKey`; checks `e.key` AND `e.keyCode` for old TV WebKits). The toggle is guarded by `e.repeat` + a 450 ms debounce (held/stuck OK can't strobe pages), pill clicks landing inside that window are dropped (shells that send BOTH keydown(13) and a synthesized click for one OK press can't un-toggle it), and its `preventDefault` suppresses the native focused-pill re-click — `updatePillSelection()` keeps focus on the selected pill, so without the toggle OK could only ever re-press the current page. Selection rules (each guard exists because a review confirmed its absence as a live failure — don't relax them): a press is **sticky** (`state.userSelected`) only when it actually **changes** the page; presses are **ignored entirely while the board has zero dogs** (empty/offline/loading — an invisible sticky flip would make the next data render open on the wrong page); with **zero today dogs the lists page is pinned on every render AND the pin clears the sticky flag it overrides** (arrivals' med/supplement text lives only there; a cleared flag means the cards default reapplies when dogs check in); the default otherwise is cards; and the **day-change reset of `userSelected` lives in `renderBoard`'s own stamp comparison** (fires on whichever render first notices the new date — including mid-outage — with the day stamped at boot so even a pre-data press is resettable). The selected pill is filled, the other is a ghost outline (`.unselected`). Page switches skip rebuilding an unchanged page via `state.renderVersion` stamps — a switch is a pure display toggle, not ~180 forced reflows on the TV CPU.
-
-**Responsive layout is JS-driven, not CSS media queries — and it is PER-CARD measure-and-fit, not a fixed per-count scale.** Two stages: (1) `applyTodayLayout()`/`todayLayoutClass(count)` pick grid geometry only (columns×rows: 1=g1 … 5-6=g6, 7-8=g8 4×2, 9=g9 3×3, 10=g10 5×2, 11-12=g12 4×3, 13-15=g15 5×3, 16-18=g18 6×3, 19-20=g20 5×4); counts ≥10 also get the `dense` class (tighter gutters, food-tags hidden — their info lives in the qty-rows); beyond the 20-dog design ceiling an inline cols×rows is derived so the board *still* renders one page. (2) `fitTodayZone()` → `fitCard()` binary-searches **each card's own `--tz`** in `[TZ_MIN=0.3, TZ_MAX=2.2]` to the largest scale where `cardFits()` is true (body/card/name not overflowing, measured in pre-transform layout px — never `getBoundingClientRect`). The floor is deliberately LOW: the owner chose **shrink-as-needed over truncation** — a packed board makes wordy cards small, never hides text. Food/med/notes **wrap** (no ellipsis); high `--med-clamp`/`--notes-clamp`/`--qty-clamp` ceilings (12/12/8) never truncate real data. Only when even `TZ_MIN=0.3` overflows (never seen in the 20-dog worst-case harness run) does `trimOverflowingCards()` shed lowest-priority content, in order: clamp/drop notes → drop the meals/food-tags row → drop extra qty-rows → clamp the **food** quantity → clamp **medication LAST** (med is never dropped, only reduced last). The lists screen has the same idea per panel (`renderNameList` → the shared `bisectScale()` on `--lz` in `[LZ_MIN=0.4, LZ_MAX=1.5]`): `listFits()` checks the container on BOTH axes **and every `.list-name`/`.list-surname` span individually** (a long name overflowing its own CSS column into the next one never grows the container — the per-span check is what stops two dogs' names overlapping); columns start at >8 / >16 items and escalate to 4 before the amber `#…ClipWarn` banner admits defeat — a safety checklist must never clip silently. Display order everywhere uses `sortDogsAlpha` (localeCompare, so 'Ébony' files under E, not after Z). The fit re-runs on every render and on `document.fonts.ready` (measure with the real Nunito, whose 900-weight glyphs need `line-height` ≥ ~1.25 to not clip under `overflow:hidden`). Preserve the no-scroll, viewport-unit (`100vh`/`100vw`) approach; verify with the headless harness.
-
-## Conventions
-
-- Frontend is **ES5-style vanilla JS** (`var`, function declarations, string concatenation for HTML, manual `escapeHtml`). Match that style — no frameworks, no build step, no template literals expected.
-- **Credentials no longer live in the `.gs` at all (since 2026-08-09/10):** the script reads them from **Script Properties** via `getCreds_()`, and the keys exposed in this repo's history were rotated and revoked (record: `_SECRETS\google-services.md`). The file stays gitignored here anyway — the live script is the source of truth and the secret-free source is published via the `Boardingplan` repo. **On rotation, only the Script Property values change** — never reintroduce a key into source, and never use the IDE settings page on this project (silent save failure against its big property blobs; runbook in `gas-gotchas`).
+Background and the full integration plan: `..\Feeding manager_Telegram\INTEGRATION.md`.
